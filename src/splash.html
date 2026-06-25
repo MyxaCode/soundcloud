@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; background: transparent; overflow: hidden;
+    font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    -webkit-user-select: none; user-select: none; }
+
+  .card {
+    width: 100%; height: 100%;
+    background: radial-gradient(130% 130% at 18% 0%, #161618 0%, #0c0c0d 60%);
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,.06);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 22px; position: relative; overflow: hidden;
+  }
+
+  .head { display: flex; align-items: center; gap: 12px; }
+  .logo { width: 38px; height: 38px; display: block; }
+  .wm b { display: block; font-size: 18px; font-weight: 700; color: #f4f4f5; letter-spacing: .2px; line-height: 1; }
+  .wm i { display: block; font-style: normal; font-size: 9px; font-weight: 600; color: #ff5500;
+    letter-spacing: 2.6px; text-transform: uppercase; margin-top: 5px; }
+
+  /* SoundCloud-style waveform that fills with orange as it loads */
+  .wave { position: relative; width: 244px; height: 40px; }
+  .layer { position: absolute; inset: 0; display: flex; align-items: center; gap: 2px; }
+  .layer span { flex: 1; min-width: 2px; border-radius: 2px; }
+  .fill { animation: reveal 1.35s cubic-bezier(.45,0,.2,1) infinite alternate; }
+  @keyframes reveal { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="head">
+      <svg class="logo" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+        <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#ff6a00"/><stop offset="1" stop-color="#ff0a5a"/>
+        </linearGradient></defs>
+        <rect width="256" height="256" rx="58" fill="url(#g)"/>
+        <g fill="#fff">
+          <rect x="40" y="120" width="18" height="64" rx="9"/>
+          <rect x="72" y="92" width="18" height="92" rx="9"/>
+          <rect x="104" y="58" width="18" height="126" rx="9"/>
+          <rect x="136" y="100" width="18" height="84" rx="9"/>
+          <rect x="168" y="74" width="18" height="110" rx="9"/>
+          <rect x="200" y="116" width="18" height="68" rx="9"/>
+        </g>
+      </svg>
+      <div class="wm"><b>SoundCloud</b><i>ServerSide</i></div>
+    </div>
+    <div class="wave">
+      <div class="layer base" id="base"></div>
+      <div class="layer fill" id="fill"></div>
+    </div>
+  </div>
+  <script>
+    var H = [.30,.52,.40,.68,.55,.82,.60,.92,.50,.36,.62,.86,.54,.72,.42,.60,.95,.50,.76,.46,
+             .64,.82,.52,.34,.58,.70,.90,.60,.42,.66,.50,.80,.46,.62,.36,.72,.56,.50,.74,.40];
+    function build(el, color) {
+      H.forEach(function (h) {
+        var s = document.createElement('span');
+        s.style.height = Math.round(h * 100) + '%';
+        s.style.background = color;
+        el.appendChild(s);
+      });
+    }
+    build(document.getElementById('base'), '#2a2a2e');
+    build(document.getElementById('fill'), '#ff5500');
+  </script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+{
+  "name": "soundcloud-serverside",
+  "version": "1.0.0",
+  "description": "A dedicated Chromium browser for SoundCloud with Discord Rich Presence",
+  "author": "ServerSide",
+  "license": "MIT",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "@xhayper/discord-rpc": "^1.2.0"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.serverside.soundcloud",
+    "productName": "SoundCloud ServerSide",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "src/**/*",
+      "assets/icon.ico",
+      "assets/icon.png",
+      "assets/icon512.png",
+      "package.json"
+    ],
+    "extraResources": [
+      { "from": "extensions", "to": "extensions", "filter": ["**/*"] }
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "SoundCloud ServerSide"
+    },
+    "portable": {
+      "artifactName": "SoundCloud-ServerSide-Portable.exe"
+    }
+  }
+}

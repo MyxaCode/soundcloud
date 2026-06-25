@@ -1,0 +1,23 @@
+{
+  "_comment": "All of this is editable in-app via F1. discordClientId is pre-set to a working SoundCloud Discord app, so Rich Presence works with no setup.",
+  "discordClientId": "1090770350251458592",
+  "signature": "Made by ServerSide",
+
+  "richPresence": true,
+  "displayWhenPaused": true,
+  "displaySmallIcon": true,
+  "displayButtons": true,
+
+  "adBlock": true,
+  "minimizeToTray": false,
+
+  "eqEnabled": false,
+  "eqPreset": "Flat",
+  "eqGains": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  "volumeBoost": 0,
+  "bassBoost": 0,
+  "accent": "#ff5500",
+  "rainbowBar": false,
+  "viz": true,
+  "customCss": ""
+}
