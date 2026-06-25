@@ -1,4 +1,4 @@
-# SoundCloud ServerSide
+# SoundCloud
 
 A dedicated SoundCloud desktop app for Windows — the web player, minus the browser tab, plus the things it never gave you: a real equalizer, Discord "Listening to" status, themes, and a live visualizer.
 
