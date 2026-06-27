@@ -1,7 +1,0 @@
-Fix rainbow seek bar override, add floating image motion, debounce saves
-
-- seek bar style applied last so rainbow is never covered by custom CSS
-- per-image motion: float, sway, pulse, drift (wrapper keeps positioning intact)
-- coalesce config writes + IPC so dragging sliders stays smooth
-- only refresh Discord status when a Discord setting actually changes
-- re-render on-page decorations if they get dropped
