@@ -1,4 +1,4 @@
-# SoundCloud ServerSide
+# SoundCloud
 
 A desktop SoundCloud client for Windows. It runs SoundCloud in its own window and adds the parts the web player is missing: a working equalizer, Discord "Listening to" status, color themes, custom images on the page, and a live visualizer.
 
