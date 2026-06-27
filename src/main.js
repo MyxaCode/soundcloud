@@ -1,4 +1,4 @@
-const { app, BrowserWindow, session, shell, ipcMain, nativeImage, Tray, Menu } = require('electron');
+const { app, BrowserWindow, session, shell, ipcMain, nativeImage, Tray, Menu, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const DiscordPresence = require('./discordPresence');
@@ -31,7 +31,10 @@ const DEFAULT_CONFIG = {
   accent: '#ff5500',
   rainbowBar: false,
   viz: true,
-  customCss: ''
+  customCss: '',
+  themeSC: false,
+  cursor: 'Default',
+  images: []
 };
 
 function configPath() {
@@ -286,6 +289,24 @@ function registerIpc() {
   });
   ipcMain.on('ss-open-external', (_e, url) => { shell.openExternal(url).catch(() => {}); });
   ipcMain.on('ss-log', (_e, msg) => log.w('[ui] ' + msg));
+
+  // native "open image" dialog -> returns a data URI (or null if cancelled)
+  ipcMain.handle('ss-pick-image', async () => {
+    try {
+      const r = await dialog.showOpenDialog(mainWindow, {
+        title: 'Pick an image',
+        properties: ['openFile'],
+        filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }]
+      });
+      if (r.canceled || !r.filePaths || !r.filePaths[0]) return null;
+      const p = r.filePaths[0];
+      const ext = path.extname(p).slice(1).toLowerCase();
+      const mime = ext === 'jpg' ? 'jpeg' : (ext || 'png');
+      const buf = fs.readFileSync(p);
+      if (buf.length > 12 * 1024 * 1024) return 'TOO_BIG';
+      return 'data:image/' + mime + ';base64,' + buf.toString('base64');
+    } catch (e) { return null; }
+  });
 }
 
 // ------------------------------------------------------------------ boot ----

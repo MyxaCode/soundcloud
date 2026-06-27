@@ -10,7 +10,8 @@
     setConfig: function () {},
     nowPlaying: function () {},
     openExternal: function () {},
-    log: function () {}
+    log: function () {},
+    pickImage: function () { return Promise.resolve(null); }
   };
 
   var DEFAULTS = {
@@ -29,12 +30,16 @@
     accent: '#ff5500',
     rainbowBar: false,
     viz: true,
-    customCss: ''
+    customCss: '',
+    themeSC: false,
+    cursor: 'Default',
+    images: []
   };
 
   var config = Object.assign({}, DEFAULTS, Bridge.getConfig() || {});
   if (!Array.isArray(config.eqGains) || config.eqGains.length !== 10) config.eqGains = DEFAULTS.eqGains.slice();
   if (!config.accent) config.accent = '#ff5500';
+  if (!Array.isArray(config.images)) config.images = [];
 
   function save(patch) { Object.assign(config, patch); try { Bridge.setConfig(patch); } catch (e) {} }
   function log() {
@@ -203,6 +208,19 @@
     '.ss-pv .tm{display:flex;justify-content:space-between;font-size:10px;color:#74747a;margin-top:5px;font-variant-numeric:tabular-nums}',
     '.ss-pv .btn{margin-top:13px;width:100%;text-align:center;background:#212125;color:#ededed;border:none;border-radius:9px;padding:9px;font-size:12px;font-weight:600;cursor:pointer;transition:.15s}',
     '.ss-pv .btn:hover{background:#2a2a2f}',
+    '#ss-decor-add{width:100%;background:#19191c;color:#e6e6e8;border:1px solid #2a2a30;border-radius:9px;padding:9px;font-size:12.5px;font-weight:600;cursor:pointer;transition:.15s}',
+    '#ss-decor-add:hover{border-color:var(--ss-accent);color:#fff}',
+    '#ss-decor-list{margin-top:10px;display:flex;flex-direction:column;gap:10px}',
+    '.ss-decor-empty{font-size:11.5px;color:#74747a;text-align:center;padding:6px 0}',
+    '.ss-decor-item{display:flex;gap:10px;align-items:flex-start;background:#151517;border:1px solid #222226;border-radius:11px;padding:10px}',
+    '.ss-decor-th{width:46px;height:46px;flex:0 0 auto;border-radius:8px;background:#0a0a0b center/contain no-repeat;border:1px solid #26262a}',
+    '.ss-decor-ctl{flex:1;min-width:0;display:flex;flex-direction:column;gap:7px}',
+    '.ss-decor-line{display:flex;align-items:center;gap:9px}',
+    '.ss-decor-line span{font-size:10.5px;color:#85858b;flex:0 0 38px}',
+    '.ss-decor-line select,.ss-decor-line input{flex:1;min-width:0}',
+    '.ss-decor-line select{font-size:11.5px;padding:5px 8px}',
+    '.ss-decor-rm{flex:0 0 auto;color:#75757a;cursor:pointer;font-size:13px;padding:4px 7px;border-radius:7px;transition:.15s}',
+    '.ss-decor-rm:hover{background:#2a1620;color:#ff6b6b}',
     '#ss-hint{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:2147483646;background:#161618;color:#dcdcdc;border:1px solid #28282c;border-radius:10px;padding:8px 15px;font:12px sans-serif;opacity:0;transition:opacity .3s;pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.45)}',
     '#ss-hint.show{opacity:1}'
   ].join('');
@@ -214,6 +232,49 @@
   }
 
   // page-level styles injected into SoundCloud (themed progress bar + custom css)
+  function hexToHsl(hex) {
+    hex = (hex || '#ff5500').replace('#', '');
+    if (hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+    var r = parseInt(hex.slice(0,2),16)/255, g = parseInt(hex.slice(2,4),16)/255, b = parseInt(hex.slice(4,6),16)/255;
+    var mx = Math.max(r,g,b), mn = Math.min(r,g,b), h = 0, s = 0, l = (mx+mn)/2;
+    if (mx !== mn) { var d = mx-mn; s = l > 0.5 ? d/(2-mx-mn) : d/(mx+mn);
+      if (mx===r) h=(g-b)/d+(g<b?6:0); else if (mx===g) h=(b-r)/d+2; else h=(r-g)/d+4; h/=6; }
+    return { h: h*360, s: s*100, l: l*100 };
+  }
+
+  // cursor presets, drawn in the current accent color
+  var CURSORS = ['Default', 'Arrow', 'Neon', 'Star', 'Dot'];
+  function svgCur(svg, hx, hy) { try { return "url('data:image/svg+xml;base64," + btoa(svg) + "') " + hx + " " + hy; } catch (e) { return ''; } }
+  function cursorValue() {
+    var a = config.accent || '#9d5cff';
+    switch (config.cursor) {
+      case 'Arrow': return svgCur('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M4 2 L4 19 L8.5 14.5 L11.5 21 L14.5 19.5 L11.5 13 L18 13 Z" fill="' + a + '" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg>', 4, 2);
+      case 'Neon': return svgCur('<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26"><circle cx="13" cy="13" r="6" fill="none" stroke="' + a + '" stroke-width="2.5"/><circle cx="13" cy="13" r="2.4" fill="' + a + '"/></svg>', 13, 13);
+      case 'Star': return svgCur('<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26"><path d="M13 2 L16 10 L24 10 L17.5 15 L20 23 L13 18 L6 23 L8.5 15 L2 10 L10 10 Z" fill="' + a + '" stroke="#fff" stroke-width="1"/></svg>', 13, 13);
+      case 'Dot': return svgCur('<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><circle cx="9" cy="9" r="6" fill="' + a + '" stroke="#fff" stroke-width="1.5"/></svg>', 9, 9);
+      default: return null;
+    }
+  }
+
+  // recolor the whole SoundCloud page in the accent color
+  function scThemeCss() {
+    var a = config.accent, hsl = hexToHsl(a), hh = Math.round(hsl.h);
+    var rot = Math.round(hsl.h - 16);
+    var deep = 'hsl(' + hh + ',32%,7%)', head = 'hsl(' + hh + ',30%,9%)', bar = 'hsl(' + hh + ',34%,10%)', line = 'hsl(' + hh + ',40%,22%)';
+    return [
+      'html,body,.l-container,#content,.l-content,.stream,.stream__content,.l-listen,.userMain,.l-account,.searchContainer,.l-fixed-content,.userStream{background-color:' + deep + '!important}',
+      '.header,.header__middle,.header__right{background:' + head + '!important}.header{border-bottom:1px solid ' + line + '!important}',
+      '.playControls,.playControls__inner,.playControls__bg,.playControls__elements{background:' + bar + '!important}',
+      '.playControls{border-top:1px solid ' + line + '!important;box-shadow:0 -6px 26px hsla(' + hh + ',60%,40%,.22)!important}',
+      '.sc-button-play,.playButton,.sc-button-cta,.waveform__layer,.sc-button-like.sc-button-selected,.sc-button-repost.sc-button-selected,.uploadButton,.upsellBanner,[class*="upsell"] .sc-button,.header a[href*="go"],.header a[href*="pro"]{filter:hue-rotate(' + rot + 'deg) saturate(1.2)!important}',
+      '.playbackTimeline__progressBackground{background:' + line + '!important}',
+      '.playbackTimeline__progressHandle{background:#fff!important;box-shadow:0 0 9px ' + a + '!important}',
+      'a:hover,.soundTitle__title:hover,.playbackSoundBadge__titleLink:hover,.sc-link-light:hover,.sc-link-primary:hover{color:' + a + '!important}',
+      '::selection{background:' + a + ';color:#fff}',
+      '::-webkit-scrollbar{width:11px;height:11px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:' + a + ';border-radius:8px;border:2px solid ' + deep + '}'
+    ].join('');
+  }
+
   var pageStyle = null;
   function applyPageStyles() {
     if (!pageStyle) {
@@ -221,13 +282,37 @@
       (document.head || document.documentElement).appendChild(pageStyle);
     }
     var css = '@keyframes ssRBpage{0%{background-position:0 0}100%{background-position:300% 0}}';
-    if (config.rainbowBar) {
-      css += '.playbackTimeline__progressBar{background:' + RAINBOW + '!important;background-size:300% 100%!important;animation:ssRBpage 4s linear infinite!important}';
-    } else {
-      css += '.playbackTimeline__progressBar{background:' + config.accent + '!important}';
-    }
+    if (config.themeSC) css += scThemeCss();
+    if (config.rainbowBar) css += '.playbackTimeline__progressBar{background:' + RAINBOW + '!important;background-size:300% 100%!important;animation:ssRBpage 4s linear infinite!important}';
+    else css += '.playbackTimeline__progressBar{background:' + config.accent + '!important}';
+    var cv = cursorValue();
+    if (cv) css += '*{cursor:' + cv + ',auto!important}input,textarea,[contenteditable]{cursor:text!important}';
     if (config.customCss) css += '\n' + config.customCss;
     pageStyle.textContent = css;
+  }
+
+  // ----- on-page image decorations -----
+  function cornerCss(pos) {
+    var off = 14, pb = 84;
+    switch (pos) {
+      case 'tl': return 'left:' + off + 'px;top:62px;';
+      case 'tr': return 'right:' + off + 'px;top:62px;';
+      case 'bl': return 'left:' + off + 'px;bottom:' + pb + 'px;';
+      case 'cl': return 'left:' + off + 'px;top:50%;transform:translateY(-50%);';
+      case 'cr': return 'right:' + off + 'px;top:50%;transform:translateY(-50%);';
+      default:   return 'right:' + off + 'px;bottom:' + pb + 'px;';
+    }
+  }
+  function renderDecor() {
+    var c = document.getElementById('ss-decor');
+    if (!c) { c = document.createElement('div'); c.id = 'ss-decor'; c.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:35'; (document.body || document.documentElement).appendChild(c); }
+    c.innerHTML = '';
+    (config.images || []).forEach(function (im) {
+      var img = document.createElement('img');
+      img.src = im.src;
+      img.style.cssText = 'position:fixed;width:' + (im.w || 200) + 'px;height:auto;opacity:' + (im.opacity != null ? im.opacity : 1) + ';pointer-events:none;filter:drop-shadow(0 7px 18px rgba(0,0,0,.45));' + cornerCss(im.pos);
+      c.appendChild(img);
+    });
   }
 
   // ============================================================== UI build ===
@@ -261,8 +346,64 @@
     return s;
   }
 
-  var panel, eqCanvas, presetSel, boostVal, preview, swatchWrap, vizCanvas;
+  var panel, eqCanvas, presetSel, boostVal, preview, swatchWrap, vizCanvas, decorList;
   var boostInpRef, bassInpRef;
+
+  // ----- image decoration manager -----
+  function addImage() {
+    Promise.resolve(Bridge.pickImage()).then(function (dataUri) {
+      if (!dataUri || dataUri === 'TOO_BIG') return;
+      capImage(dataUri, function (finalUri) {
+        config.images.push({ src: finalUri, w: 200, pos: 'br', opacity: 1 });
+        save({ images: config.images });
+        renderDecor(); buildDecorList();
+      });
+    });
+  }
+  function capImage(dataUri, cb) {
+    if (dataUri.indexOf('data:image/gif') === 0) { cb(dataUri); return; } // keep GIFs animated
+    var img = new Image();
+    img.onload = function () {
+      var max = 460, w = img.width, h = img.height;
+      if (w <= max && h <= max) { cb(dataUri); return; }
+      var sc = Math.min(max / w, max / h);
+      var cv = document.createElement('canvas'); cv.width = Math.round(w * sc); cv.height = Math.round(h * sc);
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+      try { cb(cv.toDataURL('image/png')); } catch (e) { cb(dataUri); }
+    };
+    img.onerror = function () { cb(dataUri); };
+    img.src = dataUri;
+  }
+  function buildDecorList() {
+    if (!decorList) return;
+    decorList.innerHTML = '';
+    if (!config.images.length) { decorList.appendChild(el('div', { class: 'ss-decor-empty' }, 'No images yet. Add a PNG/GIF to decorate the page.')); return; }
+    config.images.forEach(function (im, idx) {
+      var row = el('div', { class: 'ss-decor-item' });
+      var th = el('div', { class: 'ss-decor-th' }); th.style.backgroundImage = 'url("' + im.src + '")'; row.appendChild(th);
+      var ctl = el('div', { class: 'ss-decor-ctl' });
+      var pr = el('div', { class: 'ss-decor-line' }); pr.appendChild(el('span', null, 'Spot'));
+      var ps = el('select');
+      [['br', 'Bottom-right'], ['bl', 'Bottom-left'], ['tr', 'Top-right'], ['tl', 'Top-left'], ['cr', 'Right'], ['cl', 'Left']].forEach(function (o) {
+        var op = el('option', { value: o[0] }, o[1]); if (o[0] === im.pos) op.selected = true; ps.appendChild(op);
+      });
+      ps.addEventListener('change', function () { im.pos = ps.value; save({ images: config.images }); renderDecor(); });
+      pr.appendChild(ps); ctl.appendChild(pr);
+      var sr = el('div', { class: 'ss-decor-line' }); sr.appendChild(el('span', null, 'Size'));
+      var ss = el('input', { type: 'range', min: '60', max: '460', step: '5' }); ss.value = im.w || 200;
+      ss.addEventListener('input', function () { im.w = parseInt(ss.value, 10); save({ images: config.images }); renderDecor(); });
+      sr.appendChild(ss); ctl.appendChild(sr);
+      var orow = el('div', { class: 'ss-decor-line' }); orow.appendChild(el('span', null, 'Fade'));
+      var os = el('input', { type: 'range', min: '20', max: '100', step: '5' }); os.value = Math.round((im.opacity != null ? im.opacity : 1) * 100);
+      os.addEventListener('input', function () { im.opacity = parseInt(os.value, 10) / 100; save({ images: config.images }); renderDecor(); });
+      orow.appendChild(os); ctl.appendChild(orow);
+      row.appendChild(ctl);
+      var rm = el('div', { class: 'ss-decor-rm', title: 'Remove' }, '✕');
+      rm.addEventListener('click', function () { config.images.splice(idx, 1); save({ images: config.images }); renderDecor(); buildDecorList(); });
+      row.appendChild(rm);
+      decorList.appendChild(row);
+    });
+  }
 
   function applyAccent() {
     if (panel) panel.style.setProperty('--ss-accent', config.accent);
@@ -325,8 +466,24 @@
     picker.addEventListener('input', function () { config.accent = picker.value; save({ accent: picker.value }); applyAccent(); });
     pick.appendChild(picker); swatchWrap.appendChild(pick);
     aps.appendChild(swatchWrap);
+    aps.appendChild(toggleRow('Theme SoundCloud', 'Recolor the whole page in your accent color', 'themeSC', function () { applyPageStyles(); }));
     aps.appendChild(toggleRow('Rainbow music bar', 'Animated rainbow seek bar (here & in SoundCloud)', 'rainbowBar', function () { applyRainbow(); }));
+    var curRow = el('div', { class: 'ss-row' });
+    curRow.appendChild(el('div', { class: 'ss-l' }, 'Cursor'));
+    var curSel = el('select');
+    CURSORS.forEach(function (n) { var o = el('option', { value: n }, n); if (n === config.cursor) o.selected = true; curSel.appendChild(o); });
+    curSel.addEventListener('change', function () { config.cursor = curSel.value; save({ cursor: curSel.value }); applyPageStyles(); });
+    curRow.appendChild(curSel); aps.appendChild(curRow);
     panel.appendChild(aps);
+
+    // ---- Decorations (images, no CSS needed) ----
+    var dec = section('Decorations');
+    var addBtn = el('button', { id: 'ss-decor-add' }, '+  Add image');
+    addBtn.addEventListener('click', addImage);
+    dec.appendChild(addBtn);
+    decorList = el('div', { id: 'ss-decor-list' });
+    dec.appendChild(decorList);
+    panel.appendChild(dec);
 
     // ---- Equalizer ----
     var eqs = section('Equalizer');
@@ -397,6 +554,7 @@
     document.body.appendChild(panel);
     applyAccent(); applyRainbow();
     drawEq(); sliderFill(boostInpRef); sliderFill(bassInpRef);
+    buildDecorList(); renderDecor();
   }
 
   function buildPreview() {

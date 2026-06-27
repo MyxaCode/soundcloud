@@ -19,5 +19,8 @@
   "accent": "#ff5500",
   "rainbowBar": false,
   "viz": true,
-  "customCss": ""
+  "customCss": "",
+  "themeSC": false,
+  "cursor": "Default",
+  "images": []
 }

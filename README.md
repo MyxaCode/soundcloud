@@ -1,83 +1,69 @@
 # SoundCloud ServerSide
 
-A dedicated SoundCloud desktop app for Windows — the web player, minus the browser tab, plus the things it never gave you: a real equalizer, Discord "Listening to" status, themes, and a live visualizer.
+A desktop SoundCloud client for Windows. It runs SoundCloud in its own window and adds the parts the web player is missing: a working equalizer, Discord "Listening to" status, color themes, custom images on the page, and a live visualizer.
 
-Most "SoundCloud desktop" apps just point an Electron window at `soundcloud.com` and stop there. This one actually reaches into the player.
+Most SoundCloud desktop wrappers just open soundcloud.com in an Electron window and stop there. This one hooks into the player itself.
 
----
+## What it does
 
-## What makes it good
+The equalizer is real. SoundCloud plays audio through its own Web Audio graph, so grabbing the audio element and EQ-ing it does nothing. ServerSide hooks `AudioContext.createMediaElementSource` and inserts a 10-band EQ, a bass shelf and a limiter into SoundCloud's own audio chain. It actually changes the sound, and the limiter keeps heavy bass from clipping.
 
-**A real equalizer — not a placebo.**
-SoundCloud routes its audio through its own Web Audio graph, so the usual trick of grabbing the `<audio>` element and EQ-ing it doesn't work (the element is already taken). ServerSide hooks `AudioContext.createMediaElementSource` and splices a 10-band parametric EQ — plus a dedicated bass shelf and a brick-wall limiter — straight into SoundCloud's own signal chain. It changes the sound, and it never clips into mush no matter how hard you push the bass.
+Discord Rich Presence works with no setup. Your profile shows the track, artist, artwork and a live progress bar the second you press play.
 
-**Discord Rich Presence that just works.**
-Your profile shows the track, artist, artwork and a live progress bar the moment you press play. No developer portal, no API keys, no config — it ships ready.
-
-**Yours to recolor.**
-Pick any accent color and it themes the whole UI *and* SoundCloud's seek bar. Flip on the rainbow bar if you want it loud. Drop in your own CSS if you want to go further.
-
----
+You can recolor it. Pick an accent and the whole app plus SoundCloud's player take that color. There are presets, a custom color picker, a rainbow seek bar, custom cursors, and you can drop your own images onto the page straight from the settings, no CSS required.
 
 ## Features
 
-- **10-band equalizer** you shape by dragging the curve, with presets (Flat, Bass Boost, Extreme Bass, Vocal, Treble, Loudness, Electronic, Rock, Pop)
-- **Bass Boost** up to +24 dB on a dedicated low shelf, with a limiter so it stays clean
-- **Volume boost** past 100%
-- **Discord Rich Presence** — "Listening to SoundCloud", artwork, progress bar, and a profile button
-- **Themes** — 8 accent presets + a custom color picker; recolors the app and SoundCloud's player
-- **Rainbow seek bar** and a real-time **audio spectrum visualizer** that reacts to whatever's playing
-- **Custom CSS** box to restyle SoundCloud however you like
-- **Ad & tracker blocking**, **minimize to tray**, and a drop-in folder for unpacked browser extensions
-- One hotkey for everything: **F1**
-
----
+- 10-band equalizer you shape by dragging the curve, with presets
+- Bass Boost up to +24 dB with a safety limiter
+- Volume boost past 100 percent
+- Discord Rich Presence: track, artist, artwork, progress, profile button
+- Color themes: 8 presets plus a custom picker, recolors the app and SoundCloud
+- Rainbow seek bar and a live audio spectrum visualizer
+- Custom cursors and on-page image decorations, no code needed
+- Custom CSS box for anything else
+- Ad and tracker blocking, minimize to tray
+- One hotkey opens everything: F1
 
 ## Run it
 
-Download the latest build from the [Releases](../../releases) page and run `SoundCloud-ServerSide-Portable.exe` — nothing to install.
+Download the latest build from Releases and run `SoundCloud-ServerSide-Portable.exe`. Nothing to install.
 
-Or build it from source:
+Build from source:
 
 ```bash
 npm install
-npm start        # run in dev
-npm run dist     # package installer + portable .exe into dist/
+npm start
+npm run dist
 ```
 
-Requires [Node.js](https://nodejs.org) 18+. Output lands in `dist/`.
+Needs Node.js 18 or newer. Output goes to `dist/`.
 
----
+## Settings
 
-## Configuration
-
-Everything is in the **F1** panel. Settings persist to:
+Press F1 for the panel. Settings are saved to:
 
 ```
 %APPDATA%\soundcloud-serverside\config.json
 ```
 
-Discord works out of the box with a shared application id. If you'd rather run your own, create an app at the [Discord Developer Portal](https://discord.com/developers/applications) and set `discordClientId` in the config file.
-
----
+Discord works out of the box with a shared application id. To use your own, create an app at the Discord Developer Portal and set `discordClientId` in the config file.
 
 ## How it's built
 
-Electron shell, settings UI injected into the page's own world, audio handled through the Web Audio API, and a Discord IPC bridge for presence. No accounts, no telemetry, no background phone-home.
+Electron, with the settings UI injected into the page, audio through the Web Audio API, and a Discord IPC bridge for presence. No accounts, no telemetry.
 
 ```
-src/main.js            Electron main — window, tray, ad-block, session, Discord
-src/preload.js         scrapes now-playing, injects the UI
-src/ui.js              settings panel, equalizer, themes, visualizer
-src/discordPresence.js Rich Presence over @xhayper/discord-rpc
+src/main.js            window, tray, ad-block, session, Discord, image picker
+src/preload.js         reads now-playing, injects the UI
+src/ui.js              settings, equalizer, themes, cursors, decorations, visualizer
+src/discordPresence.js Rich Presence
 ```
-
----
 
 ## Disclaimer
 
-This is an unofficial third-party client and is not affiliated with or endorsed by SoundCloud. You sign in with your own account; the app stores nothing about you.
+Unofficial third-party client, not affiliated with SoundCloud. You sign in with your own account and the app keeps nothing about you.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).

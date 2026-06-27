@@ -7,7 +7,8 @@ contextBridge.exposeInMainWorld('SSBridge', {
   getConfig: () => { try { return ipcRenderer.sendSync('ss-get-config'); } catch { return {}; } },
   setConfig: (patch) => ipcRenderer.send('ss-set-config', patch),
   openExternal: (url) => ipcRenderer.send('ss-open-external', url),
-  log: (msg) => ipcRenderer.send('ss-log', msg)
+  log: (msg) => ipcRenderer.send('ss-log', msg),
+  pickImage: () => ipcRenderer.invoke('ss-pick-image')
 });
 
 // inject the settings panel + equalizer into the page's main world
