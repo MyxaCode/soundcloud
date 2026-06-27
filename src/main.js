@@ -70,6 +70,13 @@ function saveConfig() {
   }
 }
 
+// config can be large (embedded images), so don't rewrite it on every slider
+// tick - coalesce writes
+let saveTimer = null;
+function scheduleSave() { if (saveTimer) return; saveTimer = setTimeout(() => { saveTimer = null; saveConfig(); }, 500); }
+function flushSave() { if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; } saveConfig(); }
+const DISCORD_KEYS = ['richPresence', 'displayWhenPaused', 'displaySmallIcon', 'displayButtons', 'signature'];
+
 // ----------------------------------------------------------------- state ----
 let config = { ...DEFAULT_CONFIG };
 let presence = null;
@@ -271,16 +278,17 @@ function registerIpc() {
   ipcMain.on('ss-set-config', (_e, patch) => {
     if (!patch || typeof patch !== 'object') return;
     config = { ...config, ...patch };
-    saveConfig();
+    scheduleSave();
 
     if (presence) {
       presence.config = config;
-      if (!config.richPresence) presence.clear();
-      else presence.update(presence.last);
+      // only refresh the Discord status when a Discord setting actually changed
+      if (Object.keys(patch).some((k) => DISCORD_KEYS.indexOf(k) !== -1)) {
+        if (!config.richPresence) presence.clear();
+        else presence.update(presence.last);
+      }
     }
-    if ('minimizeToTray' in patch) {
-      if (config.minimizeToTray) setupTray();
-    }
+    if ('minimizeToTray' in patch && config.minimizeToTray) setupTray();
   });
 
   ipcMain.on('now-playing', (_e, data) => {
@@ -342,9 +350,10 @@ if (!gotLock) {
   });
 }
 
-app.on('before-quit', () => { app.isQuitting = true; });
+app.on('before-quit', () => { app.isQuitting = true; flushSave(); });
 
 app.on('window-all-closed', () => {
+  flushSave();
   if (presence) presence.destroy();
   if (process.platform !== 'darwin') app.quit();
 });

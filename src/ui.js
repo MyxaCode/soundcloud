@@ -41,7 +41,19 @@
   if (!config.accent) config.accent = '#ff5500';
   if (!Array.isArray(config.images)) config.images = [];
 
-  function save(patch) { Object.assign(config, patch); try { Bridge.setConfig(patch); } catch (e) {} }
+  // update in-memory config immediately, but coalesce the IPC writes so dragging
+  // a slider (especially with embedded images) doesn't flood the main process
+  var pendingPatch = {}, saveTimer = null;
+  function save(patch) {
+    Object.assign(config, patch);
+    Object.assign(pendingPatch, patch);
+    if (saveTimer) return;
+    saveTimer = setTimeout(function () {
+      saveTimer = null;
+      var p = pendingPatch; pendingPatch = {};
+      try { Bridge.setConfig(p); } catch (e) {}
+    }, 250);
+  }
   function log() {
     if (!DEBUG) return;
     var msg = [].slice.call(arguments).join(' ');
@@ -148,6 +160,10 @@
     '#ss-panel *{box-sizing:border-box}',
     '#ss-panel ::selection{background:var(--ss-accent);color:#fff}',
     '@keyframes ssRB{0%{background-position:0 0}100%{background-position:300% 0}}',
+    '@keyframes ssFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-16px)}}',
+    '@keyframes ssSway{0%,100%{transform:rotate(-3.5deg)}50%{transform:rotate(3.5deg)}}',
+    '@keyframes ssPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}',
+    '@keyframes ssDrift{0%,100%{transform:translate(0,0)}25%{transform:translate(9px,-11px)}50%{transform:translate(-7px,-17px)}75%{transform:translate(-10px,-7px)}}',
     '#ss-panel .ss-top{display:flex;align-items:center;gap:11px;padding:17px 20px;border-bottom:1px solid #1b1b1e;position:sticky;top:0;background:rgba(15,15,16,.86);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);z-index:5}',
     '#ss-panel .ss-logo{width:30px;height:30px;flex:0 0 auto;display:block}',
     '#ss-panel .ss-ttl{flex:1;line-height:1.15;min-width:0}',
@@ -283,11 +299,12 @@
     }
     var css = '@keyframes ssRBpage{0%{background-position:0 0}100%{background-position:300% 0}}';
     if (config.themeSC) css += scThemeCss();
-    if (config.rainbowBar) css += '.playbackTimeline__progressBar{background:' + RAINBOW + '!important;background-size:300% 100%!important;animation:ssRBpage 4s linear infinite!important}';
-    else css += '.playbackTimeline__progressBar{background:' + config.accent + '!important}';
     var cv = cursorValue();
     if (cv) css += '*{cursor:' + cv + ',auto!important}input,textarea,[contenteditable]{cursor:text!important}';
-    if (config.customCss) css += '\n' + config.customCss;
+    if (config.customCss) css += '\n' + config.customCss + '\n';
+    // the seek bar goes LAST so the rainbow/accent is never covered by pasted CSS
+    if (config.rainbowBar) css += '.playbackTimeline__progressBar{background:' + RAINBOW + '!important;background-size:300% 100%!important;animation:ssRBpage 4s linear infinite!important}';
+    else css += '.playbackTimeline__progressBar{background:' + config.accent + '!important}';
     pageStyle.textContent = css;
   }
 
@@ -303,15 +320,27 @@
       default:   return 'right:' + off + 'px;bottom:' + pb + 'px;';
     }
   }
+  function animFor(a) {
+    switch (a) {
+      case 'float': return 'ssFloat 4s ease-in-out infinite';
+      case 'sway': return 'ssSway 5s ease-in-out infinite';
+      case 'pulse': return 'ssPulse 3.2s ease-in-out infinite';
+      case 'drift': return 'ssDrift 9s ease-in-out infinite';
+      default: return '';
+    }
+  }
   function renderDecor() {
     var c = document.getElementById('ss-decor');
     if (!c) { c = document.createElement('div'); c.id = 'ss-decor'; c.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:35'; (document.body || document.documentElement).appendChild(c); }
     c.innerHTML = '';
     (config.images || []).forEach(function (im) {
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'position:fixed;width:' + (im.w || 200) + 'px;pointer-events:none;' + cornerCss(im.pos);
       var img = document.createElement('img');
       img.src = im.src;
-      img.style.cssText = 'position:fixed;width:' + (im.w || 200) + 'px;height:auto;opacity:' + (im.opacity != null ? im.opacity : 1) + ';pointer-events:none;filter:drop-shadow(0 7px 18px rgba(0,0,0,.45));' + cornerCss(im.pos);
-      c.appendChild(img);
+      var an = animFor(im.anim);
+      img.style.cssText = 'display:block;width:100%;height:auto;opacity:' + (im.opacity != null ? im.opacity : 1) + ';filter:drop-shadow(0 7px 18px rgba(0,0,0,.45));' + (an ? 'animation:' + an + ';' : '');
+      wrap.appendChild(img); c.appendChild(wrap);
     });
   }
 
@@ -354,7 +383,7 @@
     Promise.resolve(Bridge.pickImage()).then(function (dataUri) {
       if (!dataUri || dataUri === 'TOO_BIG') return;
       capImage(dataUri, function (finalUri) {
-        config.images.push({ src: finalUri, w: 200, pos: 'br', opacity: 1 });
+        config.images.push({ src: finalUri, w: 200, pos: 'br', opacity: 1, anim: 'float' });
         save({ images: config.images });
         renderDecor(); buildDecorList();
       });
@@ -397,6 +426,13 @@
       var os = el('input', { type: 'range', min: '20', max: '100', step: '5' }); os.value = Math.round((im.opacity != null ? im.opacity : 1) * 100);
       os.addEventListener('input', function () { im.opacity = parseInt(os.value, 10) / 100; save({ images: config.images }); renderDecor(); });
       orow.appendChild(os); ctl.appendChild(orow);
+      var mr = el('div', { class: 'ss-decor-line' }); mr.appendChild(el('span', null, 'Motion'));
+      var ms = el('select');
+      [['none', 'None'], ['float', 'Float'], ['sway', 'Sway'], ['pulse', 'Pulse'], ['drift', 'Drift']].forEach(function (o) {
+        var op = el('option', { value: o[0] }, o[1]); if ((im.anim || 'none') === o[0]) op.selected = true; ms.appendChild(op);
+      });
+      ms.addEventListener('change', function () { im.anim = ms.value; save({ images: config.images }); renderDecor(); });
+      mr.appendChild(ms); ctl.appendChild(mr);
       row.appendChild(ctl);
       var rm = el('div', { class: 'ss-decor-rm', title: 'Remove' }, '✕');
       rm.addEventListener('click', function () { config.images.splice(idx, 1); save({ images: config.images }); renderDecor(); buildDecorList(); });
@@ -693,6 +729,7 @@
   function mmss(s) { s = Math.max(0, Math.floor(s || 0)); var m = Math.floor(s / 60), r = s % 60; return m + ':' + (r < 10 ? '0' : '') + r; }
   function poll() {
     try {
+      if (config.images && config.images.length && !document.getElementById('ss-decor')) renderDecor();
       var titleEl = document.querySelector('.playbackSoundBadge__titleLink');
       if (!titleEl) { updatePreview(null); return; }
       var artistEl = document.querySelector('.playbackSoundBadge__lightLink');
