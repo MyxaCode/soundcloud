@@ -33,13 +33,19 @@
     customCss: '',
     themeSC: false,
     cursor: 'Default',
-    images: []
+    images: [],
+    hideFooter: false,
+    hideUpsell: false,
+    hideSidebar: false,
+    vizOnPage: false,
+    cssThemes: []
   };
 
   var config = Object.assign({}, DEFAULTS, Bridge.getConfig() || {});
   if (!Array.isArray(config.eqGains) || config.eqGains.length !== 10) config.eqGains = DEFAULTS.eqGains.slice();
   if (!config.accent) config.accent = '#ff5500';
   if (!Array.isArray(config.images)) config.images = [];
+  if (!Array.isArray(config.cssThemes)) config.cssThemes = [];
 
   // update in-memory config immediately, but coalesce the IPC writes so dragging
   // a slider (especially with embedded images) doesn't flood the main process
@@ -226,6 +232,16 @@
     '.ss-pv .btn:hover{background:#2a2a2f}',
     '#ss-decor-add{width:100%;background:#19191c;color:#e6e6e8;border:1px solid #2a2a30;border-radius:9px;padding:9px;font-size:12.5px;font-weight:600;cursor:pointer;transition:.15s}',
     '#ss-decor-add:hover{border-color:var(--ss-accent);color:#fff}',
+    '#ss-decor-edit{width:100%;margin-top:8px;background:#151517;color:#c8c8cc;border:1px solid #2a2a30;border-radius:9px;padding:8px;font-size:12px;font-weight:600;cursor:pointer;transition:.15s}',
+    '#ss-decor-edit:hover{border-color:var(--ss-accent)}',
+    '#ss-decor-edit.on{background:var(--ss-accent);color:#fff;border-color:var(--ss-accent)}',
+    '#ss-theme-row{display:flex;gap:8px;align-items:center}',
+    '#ss-theme-row select{flex:1;min-width:0}',
+    '.ss-mini{background:#1f1f23;color:#dcdcde;border:1px solid #2c2c32;border-radius:8px;padding:7px 11px;font-size:11.5px;font-weight:600;cursor:pointer;transition:.15s;white-space:nowrap}',
+    '.ss-mini:hover{border-color:var(--ss-accent);color:#fff}',
+    '#ss-css-btns{display:flex;gap:8px;align-items:center;margin-top:9px;flex-wrap:wrap}',
+    '#ss-theme-name{flex:1;min-width:90px;background:#0a0a0b;color:#e0e0e2;border:1px solid #29292e;border-radius:8px;padding:7px 10px;font-size:12px;outline:none}',
+    '#ss-theme-name:focus{border-color:var(--ss-accent)}',
     '#ss-decor-list{margin-top:10px;display:flex;flex-direction:column;gap:10px}',
     '.ss-decor-empty{font-size:11.5px;color:#74747a;text-align:center;padding:6px 0}',
     '.ss-decor-item{display:flex;gap:10px;align-items:flex-start;background:#151517;border:1px solid #222226;border-radius:11px;padding:10px}',
@@ -276,13 +292,14 @@
   function scThemeCss() {
     var a = config.accent, hsl = hexToHsl(a), hh = Math.round(hsl.h);
     var rot = Math.round(hsl.h - 16);
-    var deep = 'hsl(' + hh + ',32%,7%)', head = 'hsl(' + hh + ',30%,9%)', bar = 'hsl(' + hh + ',34%,10%)', line = 'hsl(' + hh + ',40%,22%)';
+    var deep = 'hsl(' + hh + ',24%,8.5%)', head = 'hsl(' + hh + ',22%,11%)', bar = 'hsl(' + hh + ',24%,12%)', card = 'hsl(' + hh + ',20%,13%)', line = 'hsl(' + hh + ',30%,24%)';
     return [
-      'html,body,.l-container,#content,.l-content,.stream,.stream__content,.l-listen,.userMain,.l-account,.searchContainer,.l-fixed-content,.userStream{background-color:' + deep + '!important}',
+      'html,body,.l-container,#content,.l-content,.stream,.stream__content,.l-listen,.userMain,.l-account,.searchContainer,.l-fixed-content,.userStream,.l-about,.l-search,.charts,.l-listen-content{background-color:' + deep + '!important}',
       '.header,.header__middle,.header__right{background:' + head + '!important}.header{border-bottom:1px solid ' + line + '!important}',
+      '.commentForm__input,.sc-input,.searchField,.modal__modal,.dropdownMenu,.moreActions{background-color:' + card + '!important;border-color:' + line + '!important}',
       '.playControls,.playControls__inner,.playControls__bg,.playControls__elements{background:' + bar + '!important}',
-      '.playControls{border-top:1px solid ' + line + '!important;box-shadow:0 -6px 26px hsla(' + hh + ',60%,40%,.22)!important}',
-      '.sc-button-play,.playButton,.sc-button-cta,.waveform__layer,.sc-button-like.sc-button-selected,.sc-button-repost.sc-button-selected,.uploadButton,.upsellBanner,[class*="upsell"] .sc-button,.header a[href*="go"],.header a[href*="pro"]{filter:hue-rotate(' + rot + 'deg) saturate(1.2)!important}',
+      '.playControls{border-top:1px solid ' + line + '!important;box-shadow:0 -6px 26px hsla(' + hh + ',55%,40%,.20)!important}',
+      '.sc-button-play,.playButton,.sc-button-cta,.waveform__layer,.sc-button-like.sc-button-selected,.sc-button-repost.sc-button-selected,.uploadButton,.upsellBanner,[class*="upsell"] .sc-button{filter:hue-rotate(' + rot + 'deg) saturate(1.05)!important}',
       '.playbackTimeline__progressBackground{background:' + line + '!important}',
       '.playbackTimeline__progressHandle{background:#fff!important;box-shadow:0 0 9px ' + a + '!important}',
       'a:hover,.soundTitle__title:hover,.playbackSoundBadge__titleLink:hover,.sc-link-light:hover,.sc-link-primary:hover{color:' + a + '!important}',
@@ -299,6 +316,9 @@
     }
     var css = '@keyframes ssRBpage{0%{background-position:0 0}100%{background-position:300% 0}}';
     if (config.themeSC) css += scThemeCss();
+    if (config.hideFooter) css += '.footer,.l-footer,.commercialContainer,.mobileApps,.appLinks,.sidebarModule.mobileApps,#app footer,.l-fixed-content>footer{display:none!important}';
+    if (config.hideUpsell) css += '.upsellBanner,.upsell,[class*="upsell"],.header__upsell,.frame-promo,.l-banner,.announcement,.playControls__goPlus,.systemPlaylistBannerItem{display:none!important}';
+    if (config.hideSidebar) css += '.l-listen-rail,.stream__suggestions,.l-sidebar-right,.l-listen .l-right{display:none!important}';
     var cv = cursorValue();
     if (cv) css += '*{cursor:' + cv + ',auto!important}input,textarea,[contenteditable]{cursor:text!important}';
     if (config.customCss) css += '\n' + config.customCss + '\n';
@@ -329,17 +349,35 @@
       default: return '';
     }
   }
+  var decorEdit = false;
+  function posCss(im) {
+    if (typeof im.x === 'number' && typeof im.y === 'number') return 'left:' + im.x + '%;top:' + im.y + '%;transform:translate(-50%,-50%);';
+    return cornerCss(im.pos);
+  }
+  function setupDecorDrag(wrap, im) {
+    wrap.addEventListener('mousedown', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      function move(ev) {
+        im.x = Math.max(0, Math.min(100, (ev.clientX / window.innerWidth) * 100));
+        im.y = Math.max(0, Math.min(100, (ev.clientY / window.innerHeight) * 100));
+        wrap.style.left = im.x + '%'; wrap.style.top = im.y + '%'; wrap.style.transform = 'translate(-50%,-50%)';
+      }
+      function up() { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); save({ images: config.images }); }
+      document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
+    });
+  }
   function renderDecor() {
     var c = document.getElementById('ss-decor');
     if (!c) { c = document.createElement('div'); c.id = 'ss-decor'; c.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:35'; (document.body || document.documentElement).appendChild(c); }
     c.innerHTML = '';
     (config.images || []).forEach(function (im) {
       var wrap = document.createElement('div');
-      wrap.style.cssText = 'position:fixed;width:' + (im.w || 200) + 'px;pointer-events:none;' + cornerCss(im.pos);
+      wrap.style.cssText = 'position:fixed;width:' + (im.w || 200) + 'px;' + (decorEdit ? 'pointer-events:auto;cursor:move;outline:2px dashed rgba(255,255,255,.45);outline-offset:3px;' : 'pointer-events:none;') + posCss(im);
+      if (decorEdit) setupDecorDrag(wrap, im);
       var img = document.createElement('img');
-      img.src = im.src;
-      var an = animFor(im.anim);
-      img.style.cssText = 'display:block;width:100%;height:auto;opacity:' + (im.opacity != null ? im.opacity : 1) + ';filter:drop-shadow(0 7px 18px rgba(0,0,0,.45));' + (an ? 'animation:' + an + ';' : '');
+      img.src = im.src; img.draggable = false;
+      var an = animFor(decorEdit ? 'none' : im.anim);
+      img.style.cssText = 'display:block;width:100%;height:auto;pointer-events:none;opacity:' + (im.opacity != null ? im.opacity : 1) + ';filter:drop-shadow(0 7px 18px rgba(0,0,0,.45));' + (an ? 'animation:' + an + ';' : '');
       wrap.appendChild(img); c.appendChild(wrap);
     });
   }
@@ -350,6 +388,18 @@
     if (attrs) for (var k in attrs) e.setAttribute(k, attrs[k]);
     if (html != null) e.innerHTML = html;
     return e;
+  }
+  // SoundCloud-style cloud-of-bars logo
+  function cloudSvg(orangeBg) {
+    var heights = [0.34, 0.50, 0.40, 0.58, 0.72, 0.85, 0.95, 1.0, 0.97, 0.90, 0.78, 0.62, 0.46, 0.36];
+    var barW = 10, gap = 5, baseY = 178, maxH = 96, S = 256;
+    var n = heights.length, totalW = n * barW + (n - 1) * gap, startX = (S - totalW) / 2, bars = '';
+    for (var i = 0; i < n; i++) {
+      var h = Math.round(heights[i] * maxH), x = Math.round(startX + i * (barW + gap)), y = baseY - h;
+      bars += '<rect x="' + x + '" y="' + y + '" width="' + barW + '" height="' + h + '" rx="5"/>';
+    }
+    var bg = orangeBg ? '<defs><linearGradient id="scg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff7800"/><stop offset="1" stop-color="#ff4400"/></linearGradient></defs><rect width="256" height="256" rx="56" fill="url(#scg)"/>' : '';
+    return '<svg viewBox="0 0 256 256" width="30" height="30" xmlns="http://www.w3.org/2000/svg">' + bg + '<g fill="' + (orangeBg ? '#fff' : '#ff5500') + '">' + bars + '</g></svg>';
   }
   function sliderFill(input) {
     if (!input) return;
@@ -416,7 +466,7 @@
       [['br', 'Bottom-right'], ['bl', 'Bottom-left'], ['tr', 'Top-right'], ['tl', 'Top-left'], ['cr', 'Right'], ['cl', 'Left']].forEach(function (o) {
         var op = el('option', { value: o[0] }, o[1]); if (o[0] === im.pos) op.selected = true; ps.appendChild(op);
       });
-      ps.addEventListener('change', function () { im.pos = ps.value; save({ images: config.images }); renderDecor(); });
+      ps.addEventListener('change', function () { im.pos = ps.value; delete im.x; delete im.y; save({ images: config.images }); renderDecor(); });
       pr.appendChild(ps); ctl.appendChild(pr);
       var sr = el('div', { class: 'ss-decor-line' }); sr.appendChild(el('span', null, 'Size'));
       var ss = el('input', { type: 'range', min: '60', max: '460', step: '5' }); ss.value = im.w || 200;
@@ -461,18 +511,9 @@
     panel = el('div', { id: 'ss-panel' });
 
     var top = el('div', { class: 'ss-top' });
-    top.appendChild(el('div', { class: 'ss-logo' },
-      '<svg viewBox="0 0 256 256" width="30" height="30" xmlns="http://www.w3.org/2000/svg">' +
-      '<defs><linearGradient id="ssLogoGrad" x1="0" y1="0" x2="1" y2="1">' +
-      '<stop offset="0" stop-color="#ff6a00"/><stop offset="1" stop-color="#ff0a5a"/></linearGradient></defs>' +
-      '<rect width="256" height="256" rx="60" fill="url(#ssLogoGrad)"/><g fill="#fff">' +
-      '<rect x="40" y="120" width="18" height="64" rx="9"/><rect x="72" y="92" width="18" height="92" rx="9"/>' +
-      '<rect x="104" y="58" width="18" height="126" rx="9"/><rect x="136" y="100" width="18" height="84" rx="9"/>' +
-      '<rect x="168" y="74" width="18" height="110" rx="9"/><rect x="200" y="116" width="18" height="68" rx="9"/>' +
-      '</g></svg>'));
+    top.appendChild(el('div', { class: 'ss-logo' }, cloudSvg(true)));
     var ttl = el('div', { class: 'ss-ttl' });
     ttl.appendChild(el('b', null, 'SoundCloud'));
-    ttl.appendChild(el('i', null, 'ServerSide'));
     top.appendChild(ttl);
     var x = el('div', { class: 'ss-x' }, '✕'); x.addEventListener('click', closePanel); top.appendChild(x);
     panel.appendChild(top);
@@ -510,6 +551,9 @@
     CURSORS.forEach(function (n) { var o = el('option', { value: n }, n); if (n === config.cursor) o.selected = true; curSel.appendChild(o); });
     curSel.addEventListener('change', function () { config.cursor = curSel.value; save({ cursor: curSel.value }); applyPageStyles(); });
     curRow.appendChild(curSel); aps.appendChild(curRow);
+    aps.appendChild(toggleRow('Hide footer', 'Hide the GO MOBILE / legal footer', 'hideFooter', function () { applyPageStyles(); }));
+    aps.appendChild(toggleRow('Hide banners', 'Hide upgrade and promo banners', 'hideUpsell', function () { applyPageStyles(); }));
+    aps.appendChild(toggleRow('Hide right sidebar', 'Hide the suggestions rail on Home', 'hideSidebar', function () { applyPageStyles(); }));
     panel.appendChild(aps);
 
     // ---- Decorations (images, no CSS needed) ----
@@ -517,6 +561,14 @@
     var addBtn = el('button', { id: 'ss-decor-add' }, '+  Add image');
     addBtn.addEventListener('click', addImage);
     dec.appendChild(addBtn);
+    var editBtn = el('button', { id: 'ss-decor-edit' }, 'Drag to place: OFF');
+    editBtn.addEventListener('click', function () {
+      decorEdit = !decorEdit;
+      editBtn.textContent = decorEdit ? 'Drag to place: ON  (drag images on the page)' : 'Drag to place: OFF';
+      editBtn.classList.toggle('on', decorEdit);
+      renderDecor();
+    });
+    dec.appendChild(editBtn);
     decorList = el('div', { id: 'ss-decor-list' });
     dec.appendChild(decorList);
     panel.appendChild(dec);
@@ -569,6 +621,7 @@
     // ---- Visualizer ----
     var viz = section('Visualizer');
     viz.appendChild(toggleRow('Live audio visualizer', 'Real-time spectrum of what is playing', 'viz', function () {}));
+    viz.appendChild(toggleRow('Show on SoundCloud', 'Overlay the spectrum along the bottom of the page', 'vizOnPage', function () { applyPageViz(); }));
     vizCanvas = el('canvas', { id: 'ss-viz' });
     viz.appendChild(vizCanvas);
     panel.appendChild(viz);
@@ -577,14 +630,43 @@
     var adv = section('Advanced');
     adv.appendChild(toggleRow('Minimize to tray', 'Closing the window hides it to the tray', 'minimizeToTray'));
     adv.appendChild(toggleRow('Ad blocker', 'Applies after restart', 'adBlock'));
-    var cssLbl = el('div', { class: 'ss-l', style: 'margin:12px 0 7px' }, 'Custom CSS for SoundCloud');
-    adv.appendChild(cssLbl);
+
     var cssBox = el('textarea', { id: 'ss-css', spellcheck: 'false', placeholder: '/* custom CSS for SoundCloud */' });
     cssBox.value = config.customCss || '';
+
+    // saved CSS themes
+    adv.appendChild(el('div', { class: 'ss-l', style: 'margin:14px 0 7px' }, 'Saved themes'));
+    var thRow = el('div', { id: 'ss-theme-row' });
+    var themeSel = el('select');
+    function refreshThemeSel() {
+      themeSel.innerHTML = '';
+      themeSel.appendChild(el('option', { value: '' }, config.cssThemes.length ? 'select a theme' : 'no saved themes'));
+      config.cssThemes.forEach(function (t, i) { themeSel.appendChild(el('option', { value: String(i) }, t.name)); });
+    }
+    refreshThemeSel();
+    var thLoad = el('button', { class: 'ss-mini' }, 'Load');
+    thLoad.addEventListener('click', function () { var i = themeSel.value; if (i === '') return; var t = config.cssThemes[+i]; if (!t) return; cssBox.value = t.css; config.customCss = t.css; save({ customCss: t.css }); applyPageStyles(); });
+    var thDel = el('button', { class: 'ss-mini' }, 'Delete');
+    thDel.addEventListener('click', function () { var i = themeSel.value; if (i === '') return; config.cssThemes.splice(+i, 1); save({ cssThemes: config.cssThemes }); refreshThemeSel(); });
+    thRow.appendChild(themeSel); thRow.appendChild(thLoad); thRow.appendChild(thDel); adv.appendChild(thRow);
+
+    // custom CSS editor + save-as-theme
+    adv.appendChild(el('div', { class: 'ss-l', style: 'margin:14px 0 7px' }, 'Custom CSS for SoundCloud'));
     adv.appendChild(cssBox);
+    var cssBtns = el('div', { id: 'ss-css-btns' });
     var cssSave = el('button', { id: 'ss-css-save' }, 'Apply CSS');
-    cssSave.addEventListener('click', function () { config.customCss = cssBox.value; save({ customCss: cssBox.value }); applyPageStyles(); cssSave.textContent = 'Applied ✓'; setTimeout(function () { cssSave.textContent = 'Apply CSS'; }, 1400); });
-    adv.appendChild(cssSave);
+    cssSave.addEventListener('click', function () { config.customCss = cssBox.value; save({ customCss: cssBox.value }); applyPageStyles(); cssSave.textContent = 'Applied'; setTimeout(function () { cssSave.textContent = 'Apply CSS'; }, 1400); });
+    var nameInp = el('input', { id: 'ss-theme-name', type: 'text', placeholder: 'theme name' });
+    var saveTheme = el('button', { class: 'ss-mini' }, 'Save as theme');
+    saveTheme.addEventListener('click', function () {
+      var nm = (nameInp.value || '').trim() || ('Theme ' + (config.cssThemes.length + 1));
+      config.cssThemes.push({ name: nm, css: cssBox.value });
+      save({ cssThemes: config.cssThemes, customCss: cssBox.value });
+      nameInp.value = ''; refreshThemeSel();
+      saveTheme.textContent = 'Saved'; setTimeout(function () { saveTheme.textContent = 'Save as theme'; }, 1400);
+    });
+    cssBtns.appendChild(cssSave); cssBtns.appendChild(nameInp); cssBtns.appendChild(saveTheme);
+    adv.appendChild(cssBtns);
     panel.appendChild(adv);
 
     document.body.appendChild(panel);
@@ -603,7 +685,7 @@
     tm.appendChild(t1); tm.appendChild(t2);
     meta.appendChild(t); meta.appendChild(a); meta.appendChild(bar); meta.appendChild(tm);
     bd.appendChild(art); bd.appendChild(meta); pv.appendChild(bd);
-    var btn = el('button', { class: 'btn' }, 'Made by ServerSide <3');
+    var btn = el('button', { class: 'btn' }, 'Listen on SoundCloud');
     btn.addEventListener('click', function () { if (preview.url) Bridge.openExternal(preview.url); });
     pv.appendChild(btn);
     preview = { art: art, t: t, a: a, bar: i, t1: t1, t2: t2, url: null };
@@ -689,27 +771,42 @@
     }
     return best;
   }
-  var vizFrame = 0, vizA = null;
-  function vizLoop() {
-    requestAnimationFrame(vizLoop);
-    if (!vizCanvas || !panelOpen) return;
-    var ctx = vizCanvas.getContext('2d');
-    var w = vizCanvas.width, h = vizCanvas.height;
-    if (!w) { resizeViz(); w = vizCanvas.width; h = vizCanvas.height; }
+  var vizFrame = 0, vizA = null, pageVizCanvas = null;
+  function drawSpectrum(canvas, bars) {
+    var ctx = canvas.getContext('2d');
+    var w = canvas.width, h = canvas.height;
+    if (!w || !h) return;
     ctx.clearRect(0, 0, w, h);
-    if (!config.viz) return;
-    if ((vizFrame++ % 10) === 0) vizA = activeAnalyser();
-    var a = vizA;
-    var bars = 56, bw = w / bars, rgb = hexToRgb(config.accent);
-    var data = null;
+    var a = vizA, bw = w / bars, rgb = hexToRgb(config.accent), data = null;
     if (a) { data = new Uint8Array(a.frequencyBinCount); a.getByteFrequencyData(data); }
     for (var i = 0; i < bars; i++) {
-      var v = data ? (data[Math.floor(i / bars * data.length * 0.7)] / 255) : (0.04 + 0.02 * Math.sin(i));
-      var bh = Math.max(2, v * (h - 6));
-      var x = i * bw;
+      var v = data ? (data[Math.floor(i / bars * data.length * 0.7)] / 255) : (0.03 + 0.02 * Math.sin(i + Date.now() / 600));
+      var bh = Math.max(2, v * (h - 4)), x = i * bw;
       if (config.rainbowBar) ctx.fillStyle = 'hsl(' + Math.round(i / bars * 320) + ',90%,58%)';
-      else ctx.fillStyle = 'rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',' + (0.45 + 0.55 * v) + ')';
+      else ctx.fillStyle = 'rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',' + (0.4 + 0.6 * v) + ')';
       ctx.fillRect(x + 1, h - bh, Math.max(1, bw - 2), bh);
+    }
+  }
+  function vizLoop() {
+    requestAnimationFrame(vizLoop);
+    var needMenu = panelOpen && config.viz && vizCanvas;
+    var needPage = config.vizOnPage && pageVizCanvas;
+    if (!needMenu && !needPage) return;
+    if ((vizFrame++ % 8) === 0) vizA = activeAnalyser();
+    if (needMenu) { if (!vizCanvas.width) resizeViz(); drawSpectrum(vizCanvas, 56); }
+    if (needPage) drawSpectrum(pageVizCanvas, 120);
+  }
+  function applyPageViz() {
+    if (config.vizOnPage) {
+      if (!pageVizCanvas) {
+        pageVizCanvas = document.createElement('canvas'); pageVizCanvas.id = 'ss-pageviz';
+        pageVizCanvas.style.cssText = 'position:fixed;left:0;bottom:56px;width:100vw;height:72px;pointer-events:none;z-index:8;opacity:.8';
+        (document.body || document.documentElement).appendChild(pageVizCanvas);
+      }
+      pageVizCanvas.width = window.innerWidth; pageVizCanvas.height = 72;
+      pageVizCanvas.style.display = '';
+    } else if (pageVizCanvas) {
+      pageVizCanvas.style.display = 'none';
     }
   }
 
@@ -765,15 +862,16 @@
     if (!document.body) { setTimeout(start, 200); return; }
     buildPanel();
     applyPageStyles();
+    applyPageViz();
     setInterval(poll, 1000);
     poll();
     requestAnimationFrame(vizLoop);
-    var hint = el('div', { id: 'ss-hint' }, 'Settings, themes & equalizer — press F1');
+    var hint = el('div', { id: 'ss-hint' }, 'Press F1 to open settings');
     document.body.appendChild(hint);
     setTimeout(function () { hint.classList.add('show'); }, 1200);
     setTimeout(function () { hint.classList.remove('show'); }, 6500);
     setTimeout(function () { if (hint.parentNode) hint.parentNode.removeChild(hint); }, 7200);
-    window.addEventListener('resize', function () { if (panelOpen) { drawEq(); resizeViz(); } });
+    window.addEventListener('resize', function () { if (panelOpen) { drawEq(); resizeViz(); } if (config.vizOnPage && pageVizCanvas) pageVizCanvas.width = window.innerWidth; });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
   else start();

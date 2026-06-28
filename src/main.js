@@ -34,7 +34,12 @@ const DEFAULT_CONFIG = {
   customCss: '',
   themeSC: false,
   cursor: 'Default',
-  images: []
+  images: [],
+  hideFooter: false,
+  hideUpsell: false,
+  hideSidebar: false,
+  vizOnPage: false,
+  cssThemes: []
 };
 
 function configPath() {

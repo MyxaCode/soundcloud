@@ -6,7 +6,7 @@ Most SoundCloud desktop wrappers just open soundcloud.com in an Electron window 
 
 ## What it does
 
-The equalizer is real. SoundCloud plays audio through its own Web Audio graph, so grabbing the audio element and EQ-ing it does nothing. ServerSide hooks `AudioContext.createMediaElementSource` and inserts a 10-band EQ, a bass shelf and a limiter into SoundCloud's own audio chain. It actually changes the sound, and the limiter keeps heavy bass from clipping.
+The equalizer is real. SoundCloud plays audio through its own Web Audio graph, so grabbing the audio element and EQ-ing it does nothing. The app hooks `AudioContext.createMediaElementSource` and inserts a 10-band EQ, a bass shelf and a limiter into SoundCloud's own audio chain. It actually changes the sound, and the limiter keeps heavy bass from clipping.
 
 Discord Rich Presence works with no setup. Your profile shows the track, artist, artwork and a live progress bar the second you press play.
 

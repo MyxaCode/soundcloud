@@ -99,7 +99,7 @@ class DiscordPresence {
       activity.endTimestamp = track.endTimestamp;
     }
     if (c.displayButtons && track.url) {
-      activity.buttons = [{ label: (c.signature || 'Made by ServerSide') + ' <3', url: track.url }];
+      activity.buttons = [{ label: 'Listen on SoundCloud', url: track.url }];
     }
 
     log.w('[discord] setActivity: ' + activity.details + ' / ' + activity.state + ' (playing=' + playing + ')');
