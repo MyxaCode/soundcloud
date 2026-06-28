@@ -13,7 +13,7 @@ function trim(s, n) {
 }
 function pad(s) {
   s = String(s || '');
-  return s.length < 2 ? s + '　' : s;
+  return s.length < 2 ? s + ' ' : s;
 }
 
 class DiscordPresence {
@@ -68,7 +68,6 @@ class DiscordPresence {
     if (!c.richPresence) { log.w('[discord] update skip: richPresence off'); this.clear(); return; }
     if (!track || !track.title) { log.w('[discord] update skip: no track/title'); this.clear(); return; }
 
-    // not connected yet - the track is stored in this.last and replayed on ready
     if (!this.client || !this.client.user) {
       log.w('[discord] update deferred: not connected yet (will replay on ready)');
       return;
@@ -88,7 +87,6 @@ class DiscordPresence {
       largeImageKey: track.artwork || 'soundcloud-logo',
       instance: false
     };
-    // no largeImageText -> keeps the card clean (no duplicate of the title)
 
     if (c.displaySmallIcon) {
       activity.smallImageKey = 'soundcloud-logo';
@@ -98,8 +96,9 @@ class DiscordPresence {
       activity.startTimestamp = track.startTimestamp;
       activity.endTimestamp = track.endTimestamp;
     }
-    if (c.displayButtons && track.url) {
-      activity.buttons = [{ label: 'Listen on SoundCloud', url: track.url }];
+    
+    if (c.displayButtons) {
+      activity.buttons = [{ label: 'My GitHub', url: 'https://github.com/MyxaCode' }];
     }
 
     log.w('[discord] setActivity: ' + activity.details + ' / ' + activity.state + ' (playing=' + playing + ')');
