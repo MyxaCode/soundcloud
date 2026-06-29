@@ -97,7 +97,7 @@ class DiscordPresence {
       activity.endTimestamp = track.endTimestamp;
     }
     if (c.displayButtons) {
-      activity.buttons = [{ label: 'My GitHub', url: 'https://github.com/MyxaCode' }];
+      activity.buttons = [{ label: 'Listen on SoundCloud', url: 'https://github.com/MyxaCode/soundcloud' }];
     }
 
     log.w('[discord] setActivity: ' + activity.details + ' / ' + activity.state + ' (playing=' + playing + ')');

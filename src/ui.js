@@ -656,8 +656,8 @@
     tm.appendChild(t1); tm.appendChild(t2);
     meta.appendChild(t); meta.appendChild(a); meta.appendChild(bar); meta.appendChild(tm);
     bd.appendChild(art); bd.appendChild(meta); pv.appendChild(bd);
-    var btn = el('button', { class: 'btn' }, 'My GitHub');
-    btn.addEventListener('click', function () { Bridge.openExternal('https://github.com/MyxaCode'); });
+    var btn = el('button', { class: 'btn' }, 'Listen on SoundCloud');
+    btn.addEventListener('click', function () { Bridge.openExternal('https://github.com/MyxaCode/soundcloud'); });
     pv.appendChild(btn);
     preview = { art: art, t: t, a: a, bar: i, t1: t1, t2: t2, url: null };
     return pv;
