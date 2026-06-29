@@ -6,23 +6,18 @@ const log = require('./log');
 
 const isDev = !app.isPackaged;
 
-// ---------------------------------------------------------------- config ----
 const DEFAULT_CONFIG = {
-  // public SoundCloud Discord app (has the soundcloud-logo asset) - works out of the box
   discordClientId: '1090770350251458592',
-  signature: 'Made by ServerSide',
+  signature: '',
 
-  // Discord Rich Presence
   richPresence: true,
   displayWhenPaused: true,
   displaySmallIcon: true,
   displayButtons: true,
 
-  // Client
   adBlock: true,
   minimizeToTray: false,
 
-  // Equalizer
   eqEnabled: false,
   eqPreset: 'Flat',
   eqGains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -55,7 +50,6 @@ function loadConfig() {
     }
     const data = JSON.parse(fs.readFileSync(p, 'utf8'));
     const merged = { ...DEFAULT_CONFIG, ...data };
-    // migrate the stale placeholder clientId saved by older builds
     if (!merged.discordClientId || merged.discordClientId === '0000000000000000000') {
       merged.discordClientId = DEFAULT_CONFIG.discordClientId;
       try { fs.writeFileSync(p, JSON.stringify(merged, null, 2), 'utf8'); } catch (e) {}
@@ -75,14 +69,11 @@ function saveConfig() {
   }
 }
 
-// config can be large (embedded images), so don't rewrite it on every slider
-// tick - coalesce writes
 let saveTimer = null;
 function scheduleSave() { if (saveTimer) return; saveTimer = setTimeout(() => { saveTimer = null; saveConfig(); }, 500); }
 function flushSave() { if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; } saveConfig(); }
 const DISCORD_KEYS = ['richPresence', 'displayWhenPaused', 'displaySmallIcon', 'displayButtons', 'signature'];
 
-// ----------------------------------------------------------------- state ----
 let config = { ...DEFAULT_CONFIG };
 let presence = null;
 let mainWindow = null;
@@ -90,8 +81,6 @@ let splash = null;
 let tray = null;
 
 const SC_URL = 'https://soundcloud.com/discover';
-// clean Chrome UA (no Electron token, version matches the bundled Chromium) so
-// SoundCloud's bot protection lets the user sign in
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
           '(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
 
@@ -109,7 +98,6 @@ const AD_HOSTS = [
   '*://*.adsafeprotected.com/*'
 ];
 
-// --------------------------------------------------------------- helpers ----
 function isSoundCloud(url) {
   try {
     const h = new URL(url).hostname;
@@ -130,15 +118,9 @@ function appIcon() {
   return fs.existsSync(p) ? nativeImage.createFromPath(p) : undefined;
 }
 
-// ----------------------------------------------- network: CORS + CSP --------
-// We control the session, so we force CORS on the audio streams (lets the
-// equalizer process the sound instead of being muted) and drop the page CSP
-// so our settings UI can be injected into the page's own context.
 function setupSession() {
   const ses = session.defaultSession;
 
-  // Present as a normal Chrome browser with consistent client hints so the
-  // sign-in flow isn't flagged as a bot.
   ses.webRequest.onBeforeSendHeaders((details, cb) => {
     const u = details.url;
     if (u.includes('google') || u.includes('gstatic') || u.includes('apple') || u.includes('icloud')) {
@@ -161,7 +143,6 @@ function setupSession() {
   }
 }
 
-// --------------------------------------------------------------- windows ----
 function createSplash() {
   splash = new BrowserWindow({
     width: 330,
@@ -193,7 +174,7 @@ function createMainWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false, // allow the preload to require ./ui.js and use Node APIs
+      sandbox: false,
       spellcheck: false,
       backgroundThrottling: false
     }
@@ -255,7 +236,6 @@ function setupTray() {
   });
 }
 
-// --------------------------------------------------- chrome extensions ------
 async function loadExtensions() {
   const dir = extensionsDir();
   try {
@@ -276,7 +256,6 @@ async function loadExtensions() {
   }
 }
 
-// ------------------------------------------------------------------ ipc -----
 function registerIpc() {
   ipcMain.on('ss-get-config', (e) => { e.returnValue = config; });
 
@@ -287,7 +266,6 @@ function registerIpc() {
 
     if (presence) {
       presence.config = config;
-      // only refresh the Discord status when a Discord setting actually changed
       if (Object.keys(patch).some((k) => DISCORD_KEYS.indexOf(k) !== -1)) {
         if (!config.richPresence) presence.clear();
         else presence.update(presence.last);
@@ -303,7 +281,6 @@ function registerIpc() {
   ipcMain.on('ss-open-external', (_e, url) => { shell.openExternal(url).catch(() => {}); });
   ipcMain.on('ss-log', (_e, msg) => log.w('[ui] ' + msg));
 
-  // native "open image" dialog -> returns a data URI (or null if cancelled)
   ipcMain.handle('ss-pick-image', async () => {
     try {
       const r = await dialog.showOpenDialog(mainWindow, {
@@ -322,7 +299,6 @@ function registerIpc() {
   });
 }
 
-// ------------------------------------------------------------------ boot ----
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();

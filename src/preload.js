@@ -2,7 +2,6 @@ const { contextBridge, ipcRenderer } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
-// bridge for the in-page settings UI (config, links, logging)
 contextBridge.exposeInMainWorld('SSBridge', {
   getConfig: () => { try { return ipcRenderer.sendSync('ss-get-config'); } catch { return {}; } },
   setConfig: (patch) => ipcRenderer.send('ss-set-config', patch),
@@ -11,7 +10,6 @@ contextBridge.exposeInMainWorld('SSBridge', {
   pickImage: () => ipcRenderer.invoke('ss-pick-image')
 });
 
-// inject the settings panel + equalizer into the page's main world
 let UI = '';
 try {
   UI = fs.readFileSync(path.join(__dirname, 'ui.js'), 'utf8');
@@ -25,16 +23,11 @@ function inject() {
     s.textContent = UI;
     (document.head || document.documentElement).appendChild(s);
     s.remove();
-  } catch { /* not ready yet */ }
+  } catch {}
 }
 inject();
 document.addEventListener('DOMContentLoaded', inject);
 
-// -------------------------------------------------------------------------
-// Now-playing scraping runs HERE in the preload (isolated world) and goes
-// straight to the main process via ipcRenderer - exactly like soundcloud-rpc.
-// This is the reliable path that drives the Discord Rich Presence.
-// -------------------------------------------------------------------------
 function abs(u) { return !u ? null : (u.indexOf('http') === 0 ? u : 'https://soundcloud.com' + u); }
 function hiRes(a) { return a ? a.replace(/-t\d+x\d+\./, '-t500x500.') : null; }
 
@@ -58,15 +51,12 @@ function scrape() {
     const wrap = document.querySelector('.playbackTimeline__progressWrapper');
     if (wrap) { nowVal = parseFloat(wrap.getAttribute('aria-valuenow')); maxVal = parseFloat(wrap.getAttribute('aria-valuemax')); }
 
-    // playing detection: the moving progress bar is the source of truth (the
-    // play-button class lies sometimes). Only fall back to the button when we
-    // have no progress delta yet (first poll on a track / after a seek).
     const trackId = url || title;
     const sameTrack = (trackId === lastTrackId);
     let playing;
-    if (sameTrack && lastNow != null && !isNaN(nowVal) && nowVal > lastNow + 0.2) playing = true;            // advancing
-    else if (sameTrack && lastNow != null && !isNaN(nowVal) && Math.abs(nowVal - lastNow) < 0.05) playing = false; // frozen
-    else playing = true;                                                                                     // first poll on a track: assume playing, frozen-check corrects next tick
+    if (sameTrack && lastNow != null && !isNaN(nowVal) && nowVal > lastNow + 0.2) playing = true;
+    else if (sameTrack && lastNow != null && !isNaN(nowVal) && Math.abs(nowVal - lastNow) < 0.05) playing = false;
+    else playing = true;
     if (!isNaN(nowVal)) lastNow = nowVal;
     lastTrackId = trackId;
 
@@ -90,6 +80,6 @@ function scrape() {
     if (key === lastKey) return;
     lastKey = key;
     ipcRenderer.send('now-playing', data);
-  } catch (e) { /* transient DOM states */ }
+  } catch (e) {}
 }
 setInterval(scrape, 1500);

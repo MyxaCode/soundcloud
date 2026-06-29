@@ -15,7 +15,7 @@
   };
 
   var DEFAULTS = {
-    signature: 'Made by ServerSide',
+    signature: '',
     richPresence: true,
     displayWhenPaused: true,
     displaySmallIcon: true,
@@ -47,8 +47,6 @@
   if (!Array.isArray(config.images)) config.images = [];
   if (!Array.isArray(config.cssThemes)) config.cssThemes = [];
 
-  // update in-memory config immediately, but coalesce the IPC writes so dragging
-  // a slider (especially with embedded images) doesn't flood the main process
   var pendingPatch = {}, saveTimer = null;
   function save(patch) {
     Object.assign(config, patch);
@@ -74,7 +72,6 @@
     { n: 'Pink', c: '#ff4fa3' }, { n: 'Gold', c: '#ffb300' }
   ];
 
-  // ================================================================ EQ DSP ===
   var FREQS = [60, 170, 310, 600, 1000, 3000, 6000, 12000, 14000, 16000];
   var LABELS = ['60', '170', '310', '600', '1k', '3k', '6k', '12k', '14k', '16k'];
   var DOT_COLORS = ['#4f8cff', '#9b59ff', '#ff4fa3', '#ff5f5f', '#ff8a3d',
@@ -94,8 +91,6 @@
 
   function dbToGain(db) { return Math.pow(10, (db || 0) / 20); }
 
-  // SoundCloud plays through its OWN Web Audio graph, so we hook
-  // AudioContext.createMediaElementSource and splice our chain into its graph.
   var eqChains = [];
   function buildChain(ctx) {
     var input = ctx.createGain();
@@ -153,7 +148,6 @@
   function applyBoost() { for (var c = 0; c < eqChains.length; c++) eqChains[c].boost.gain.value = dbToGain(config.volumeBoost || 0); }
   function applyBass() { for (var c = 0; c < eqChains.length; c++) if (eqChains[c].bass) eqChains[c].bass.gain.value = config.bassBoost || 0; }
 
-  // =================================================================== CSS ===
   var CSS = [
     '::-webkit-scrollbar{width:9px;height:9px}',
     '::-webkit-scrollbar-track{background:transparent}',
@@ -194,7 +188,6 @@
     '#ss-panel input[type=range]{-webkit-appearance:none;appearance:none;height:4px;background:#27272b;border-radius:4px;outline:none;cursor:pointer}',
     '#ss-panel input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:var(--ss-accent);cursor:pointer;box-shadow:0 1px 5px rgba(0,0,0,.5);transition:transform .12s}',
     '#ss-panel input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.18)}',
-    // theme swatches
     '#ss-themes{display:flex;flex-wrap:wrap;gap:9px;margin:2px 0 4px}',
     '#ss-themes .sw-c{width:26px;height:26px;border-radius:8px;cursor:pointer;position:relative;transition:transform .12s;border:2px solid transparent}',
     '#ss-themes .sw-c:hover{transform:scale(1.12)}',
@@ -202,21 +195,17 @@
     '#ss-themes .sw-c.rb{background:' + RAINBOW + ';background-size:300% 100%;animation:ssRB 4s linear infinite}',
     '#ss-themes .sw-pick{width:26px;height:26px;border-radius:8px;overflow:hidden;border:2px solid #29292e;cursor:pointer;padding:0;background:#19191c}',
     '#ss-themes .sw-pick input{width:200%;height:200%;border:none;background:none;cursor:pointer;transform:translate(-25%,-25%)}',
-    // equalizer + visualizer
     '#ss-eq-canvas{width:100%;height:152px;display:block;background:#0a0a0b;border:1px solid #1b1b1e;border-radius:12px;margin:7px 0 4px;cursor:ns-resize;touch-action:none}',
     '#ss-eq-hint{font-size:11px;color:#5c5c61;text-align:center;margin-top:8px}',
     '#ss-viz{width:100%;height:64px;display:block;background:#0a0a0b;border:1px solid #1b1b1e;border-radius:12px}',
-    // bass + boost rows
     '#ss-bass-row,#ss-boost-row{display:flex;align-items:center;gap:13px;margin-top:14px}',
     '#ss-bass-row .ss-bass-lbl{font-size:13px;color:#e6e6e8;font-weight:500;flex:0 0 auto;white-space:nowrap}',
     '#ss-bass-row input,#ss-boost-row input{flex:1}',
     '#ss-bass-row .ss-bass-val,#ss-boost-val{font-size:12px;color:var(--ss-accent);min-width:52px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums}',
-    // custom css textarea
     '#ss-css{width:100%;height:90px;resize:vertical;background:#0a0a0b;color:#d6d6d8;border:1px solid #29292e;border-radius:10px;padding:10px 11px;font:12px/1.5 ui-monospace,Consolas,monospace;outline:none}',
     '#ss-css:focus{border-color:var(--ss-accent)}',
     '#ss-css-save{margin-top:9px;background:var(--ss-accent);color:#fff;border:none;border-radius:9px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer;transition:.15s}',
     '#ss-css-save:hover{filter:brightness(1.1)}',
-    // preview card
     '.ss-pv{margin-top:14px;background:#151517;border:1px solid #222226;border-radius:13px;padding:14px}',
     '.ss-pv .hd{font-size:9.5px;font-weight:700;letter-spacing:1.2px;color:#74747a;margin-bottom:11px;text-transform:uppercase}',
     '.ss-pv .bd{display:flex;gap:12px}',
@@ -263,7 +252,6 @@
     (document.head || document.documentElement).appendChild(st);
   }
 
-  // page-level styles injected into SoundCloud (themed progress bar + custom css)
   function hexToHsl(hex) {
     hex = (hex || '#ff5500').replace('#', '');
     if (hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
@@ -274,7 +262,6 @@
     return { h: h*360, s: s*100, l: l*100 };
   }
 
-  // cursor presets, drawn in the current accent color
   var CURSORS = ['Default', 'Arrow', 'Neon', 'Star', 'Dot'];
   function svgCur(svg, hx, hy) { try { return "url('data:image/svg+xml;base64," + btoa(svg) + "') " + hx + " " + hy; } catch (e) { return ''; } }
   function cursorValue() {
@@ -288,7 +275,6 @@
     }
   }
 
-  // recolor the whole SoundCloud page in the accent color
   function scThemeCss() {
     var a = config.accent, hsl = hexToHsl(a), hh = Math.round(hsl.h);
     var rot = Math.round(hsl.h - 16);
@@ -322,13 +308,11 @@
     var cv = cursorValue();
     if (cv) css += '*{cursor:' + cv + ',auto!important}input,textarea,[contenteditable]{cursor:text!important}';
     if (config.customCss) css += '\n' + config.customCss + '\n';
-    // the seek bar goes LAST so the rainbow/accent is never covered by pasted CSS
     if (config.rainbowBar) css += '.playbackTimeline__progressBar{background:' + RAINBOW + '!important;background-size:300% 100%!important;animation:ssRBpage 4s linear infinite!important}';
     else css += '.playbackTimeline__progressBar{background:' + config.accent + '!important}';
     pageStyle.textContent = css;
   }
 
-  // ----- on-page image decorations -----
   function cornerCss(pos) {
     var off = 14, pb = 84;
     switch (pos) {
@@ -382,14 +366,12 @@
     });
   }
 
-  // ============================================================== UI build ===
   function el(tag, attrs, html) {
     var e = document.createElement(tag);
     if (attrs) for (var k in attrs) e.setAttribute(k, attrs[k]);
     if (html != null) e.innerHTML = html;
     return e;
   }
-  // SoundCloud-style cloud-of-bars logo
   function cloudSvg(orangeBg) {
     var heights = [0.34, 0.50, 0.40, 0.58, 0.72, 0.85, 0.95, 1.0, 0.97, 0.90, 0.78, 0.62, 0.46, 0.36];
     var barW = 10, gap = 5, baseY = 178, maxH = 96, S = 256;
@@ -428,7 +410,6 @@
   var panel, eqCanvas, presetSel, boostVal, preview, swatchWrap, vizCanvas, decorList;
   var boostInpRef, bassInpRef;
 
-  // ----- image decoration manager -----
   function addImage() {
     Promise.resolve(Bridge.pickImage()).then(function (dataUri) {
       if (!dataUri || dataUri === 'TOO_BIG') return;
@@ -440,7 +421,7 @@
     });
   }
   function capImage(dataUri, cb) {
-    if (dataUri.indexOf('data:image/gif') === 0) { cb(dataUri); return; } // keep GIFs animated
+    if (dataUri.indexOf('data:image/gif') === 0) { cb(dataUri); return; }
     var img = new Image();
     img.onload = function () {
       var max = 460, w = img.width, h = img.height;
@@ -518,16 +499,14 @@
     var x = el('div', { class: 'ss-x' }, '✕'); x.addEventListener('click', closePanel); top.appendChild(x);
     panel.appendChild(top);
 
-    // ---- Discord ----
     var dsc = section('Discord');
     dsc.appendChild(toggleRow('Rich Presence', 'Show your track on your Discord profile', 'richPresence'));
     dsc.appendChild(toggleRow('Show when paused', null, 'displayWhenPaused'));
     dsc.appendChild(toggleRow('Small icon', 'Logo with caption under the artwork', 'displaySmallIcon'));
-    dsc.appendChild(toggleRow('Track button', '"Made by ServerSide" button on your profile', 'displayButtons'));
+    dsc.appendChild(toggleRow('Profile button', '"Listen on SoundCloud" button on your Discord profile', 'displayButtons'));
     dsc.appendChild(buildPreview());
     panel.appendChild(dsc);
 
-    // ---- Appearance ----
     var aps = section('Appearance');
     swatchWrap = el('div', { id: 'ss-themes' });
     THEMES.forEach(function (t) {
@@ -536,7 +515,6 @@
       c.addEventListener('click', function () { config.accent = t.c; save({ accent: t.c }); applyAccent(); });
       swatchWrap.appendChild(c);
     });
-    // custom color picker
     var pick = el('label', { class: 'sw-pick', title: 'Custom color' });
     var picker = el('input', { type: 'color' });
     try { picker.value = config.accent; } catch (e) { picker.value = '#ff5500'; }
@@ -556,7 +534,6 @@
     aps.appendChild(toggleRow('Hide right sidebar', 'Hide the suggestions rail on Home', 'hideSidebar', function () { applyPageStyles(); }));
     panel.appendChild(aps);
 
-    // ---- Decorations (images, no CSS needed) ----
     var dec = section('Decorations');
     var addBtn = el('button', { id: 'ss-decor-add' }, '+  Add image');
     addBtn.addEventListener('click', addImage);
@@ -573,7 +550,6 @@
     dec.appendChild(decorList);
     panel.appendChild(dec);
 
-    // ---- Equalizer ----
     var eqs = section('Equalizer');
     eqs.appendChild(toggleRow('Enable equalizer', null, 'eqEnabled', function () { applyEq(); drawEq(); }));
     var prow = el('div', { class: 'ss-row' });
@@ -605,7 +581,6 @@
     bassRow.appendChild(bassInpRef); bassRow.appendChild(bbVal); eqs.appendChild(bassRow);
     panel.appendChild(eqs);
 
-    // ---- Volume ----
     var vbs = section('Volume Boost');
     var brow = el('div', { id: 'ss-boost-row' });
     boostInpRef = el('input', { type: 'range', min: '0', max: '15', step: '1' }); boostInpRef.value = config.volumeBoost;
@@ -618,7 +593,6 @@
     brow.appendChild(boostInpRef); brow.appendChild(boostVal); vbs.appendChild(brow);
     panel.appendChild(vbs);
 
-    // ---- Visualizer ----
     var viz = section('Visualizer');
     viz.appendChild(toggleRow('Live audio visualizer', 'Real-time spectrum of what is playing', 'viz', function () {}));
     viz.appendChild(toggleRow('Show on SoundCloud', 'Overlay the spectrum along the bottom of the page', 'vizOnPage', function () { applyPageViz(); }));
@@ -626,7 +600,6 @@
     viz.appendChild(vizCanvas);
     panel.appendChild(viz);
 
-    // ---- Advanced ----
     var adv = section('Advanced');
     adv.appendChild(toggleRow('Minimize to tray', 'Closing the window hides it to the tray', 'minimizeToTray'));
     adv.appendChild(toggleRow('Ad blocker', 'Applies after restart', 'adBlock'));
@@ -634,7 +607,6 @@
     var cssBox = el('textarea', { id: 'ss-css', spellcheck: 'false', placeholder: '/* custom CSS for SoundCloud */' });
     cssBox.value = config.customCss || '';
 
-    // saved CSS themes
     adv.appendChild(el('div', { class: 'ss-l', style: 'margin:14px 0 7px' }, 'Saved themes'));
     var thRow = el('div', { id: 'ss-theme-row' });
     var themeSel = el('select');
@@ -650,7 +622,6 @@
     thDel.addEventListener('click', function () { var i = themeSel.value; if (i === '') return; config.cssThemes.splice(+i, 1); save({ cssThemes: config.cssThemes }); refreshThemeSel(); });
     thRow.appendChild(themeSel); thRow.appendChild(thLoad); thRow.appendChild(thDel); adv.appendChild(thRow);
 
-    // custom CSS editor + save-as-theme
     adv.appendChild(el('div', { class: 'ss-l', style: 'margin:14px 0 7px' }, 'Custom CSS for SoundCloud'));
     adv.appendChild(cssBox);
     var cssBtns = el('div', { id: 'ss-css-btns' });
@@ -679,20 +650,19 @@
     var pv = el('div', { class: 'ss-pv' });
     pv.appendChild(el('div', { class: 'hd' }, 'LISTENING TO SOUNDCLOUD'));
     var bd = el('div', { class: 'bd' }), art = el('div', { class: 'art' }), meta = el('div', { class: 'meta' });
-    var t = el('div', { class: 't' }, 'Nothing playing'), a = el('div', { class: 'a' }, '—');
+    var t = el('div', { class: 't' }, 'Nothing playing'), a = el('div', { class: 'a' }, '');
     var bar = el('div', { class: 'bar' }), i = el('i'); bar.appendChild(i);
     var tm = el('div', { class: 'tm' }), t1 = el('span', null, '0:00'), t2 = el('span', null, '0:00');
     tm.appendChild(t1); tm.appendChild(t2);
     meta.appendChild(t); meta.appendChild(a); meta.appendChild(bar); meta.appendChild(tm);
     bd.appendChild(art); bd.appendChild(meta); pv.appendChild(bd);
     var btn = el('button', { class: 'btn' }, 'Listen on SoundCloud');
-    btn.addEventListener('click', function () { if (preview.url) Bridge.openExternal(preview.url); });
+    btn.addEventListener('click', function () { Bridge.openExternal('https://github.com/MyxaCode/soundcloud'); });
     pv.appendChild(btn);
     preview = { art: art, t: t, a: a, bar: i, t1: t1, t2: t2, url: null };
     return pv;
   }
 
-  // ====================================================== draggable curve ===
   function geom() {
     var w = eqCanvas.width, h = eqCanvas.height, padX = 26, top = 14, bot = h - 20;
     return { w: w, h: h, padX: padX, top: top, bot: bot, mid: (top + bot) / 2, half: (bot - top) / 2 - 2 };
@@ -756,10 +726,8 @@
     eqCanvas.addEventListener('wheel', function (e) { e.preventDefault(); }, { passive: false });
   }
 
-  // ============================================================ visualizer ===
   function resizeViz() { if (vizCanvas) { vizCanvas.width = vizCanvas.clientWidth || 330; vizCanvas.height = 64; } }
   function hexToRgb(h) { h = h.replace('#', ''); if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2]; var n = parseInt(h, 16); return [(n>>16)&255,(n>>8)&255,n&255]; }
-  // SoundCloud pools many audio sources; find the analyser that actually has sound
   var vizProbe = new Uint8Array(32);
   function activeAnalyser() {
     var best = null, bestE = 0;
@@ -810,7 +778,6 @@
     }
   }
 
-  // =============================================================== hotkeys ===
   var panelOpen = false;
   function openPanel() { if (panel) { panel.classList.add('open'); panelOpen = true; drawEq(); resizeViz(); } }
   function closePanel() { if (panel) { panel.classList.remove('open'); panelOpen = false; } }
@@ -820,7 +787,6 @@
     else if (e.key === 'Escape' && panelOpen) closePanel();
   }, true);
 
-  // =========================================================== now playing ===
   function abs(u) { return !u ? null : (u.indexOf('http') === 0 ? u : 'https://soundcloud.com' + u); }
   function hiRes(a) { return a ? a.replace(/-t\d+x\d+\./, '-t500x500.') : null; }
   function mmss(s) { s = Math.max(0, Math.floor(s || 0)); var m = Math.floor(s / 60), r = s % 60; return m + ':' + (r < 10 ? '0' : '') + r; }
@@ -843,7 +809,7 @@
   function updatePreview(data, now, max) {
     if (!preview) return;
     if (!data || !data.title) {
-      preview.t.textContent = 'Nothing playing'; preview.a.textContent = '—';
+      preview.t.textContent = 'Nothing playing'; preview.a.textContent = '';
       preview.art.style.backgroundImage = ''; preview.bar.style.width = '0%';
       preview.t1.textContent = '0:00'; preview.t2.textContent = '0:00'; preview.url = null; return;
     }
@@ -857,7 +823,6 @@
     }
   }
 
-  // ================================================================== boot ===
   function start() {
     if (!document.body) { setTimeout(start, 200); return; }
     buildPanel();
