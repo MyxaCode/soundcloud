@@ -33,6 +33,7 @@ const DEFAULT_CONFIG = {
   hideFooter: false,
   hideUpsell: false,
   hideSidebar: false,
+  clearHeader: true,
   vizOnPage: false,
   vizFloat: false,
   vizX: 50,

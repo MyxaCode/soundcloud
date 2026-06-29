@@ -37,6 +37,7 @@
     hideFooter: false,
     hideUpsell: false,
     hideSidebar: false,
+    clearHeader: true,
     vizOnPage: false,
     vizFloat: false,
     vizX: 50, vizY: 86,
@@ -330,6 +331,7 @@
     }
     var css = '@keyframes ssRBpage{0%{background-position:0 0}100%{background-position:300% 0}}';
     if (config.themeSC) css += scThemeCss();
+    if (config.clearHeader) css += '.header,.header__middle,.header__right,.header__left,.l-fixed-top,.header__overflowMenu{background:transparent!important;background-color:transparent!important;border:none!important;box-shadow:none!important}.header__logo,.header__nav,.headerMenu__link,.header a,.header button{position:relative;z-index:2}';
     if (config.hideFooter) css += '.footer,.l-footer,.commercialContainer,.mobileApps,.appLinks,.sidebarModule.mobileApps,#app footer,.l-fixed-content>footer{display:none!important}';
     if (config.hideUpsell) css += '.upsellBanner,.upsell,[class*="upsell"],.header__upsell,.frame-promo,.l-banner,.announcement,.playControls__goPlus,.systemPlaylistBannerItem{display:none!important}';
     if (config.hideSidebar) css += '.l-listen-rail,.stream__suggestions,.l-sidebar-right,.l-listen .l-right{display:none!important}';
@@ -579,6 +581,7 @@
     CURSORS.forEach(function (n) { var o = el('option', { value: n }, n); if (n === config.cursor) o.selected = true; curSel.appendChild(o); });
     curSel.addEventListener('change', function () { config.cursor = curSel.value; save({ cursor: curSel.value }); applyPageStyles(); });
     curRow.appendChild(curSel); aps.appendChild(curRow);
+    aps.appendChild(toggleRow('See-through header', 'Clear the top bar so photos show behind it (buttons stay)', 'clearHeader', function () { applyPageStyles(); }));
     aps.appendChild(toggleRow('Hide footer', 'Hide the GO MOBILE / legal footer', 'hideFooter', function () { applyPageStyles(); }));
     aps.appendChild(toggleRow('Hide banners', 'Hide upgrade and promo banners', 'hideUpsell', function () { applyPageStyles(); }));
     aps.appendChild(toggleRow('Hide right sidebar', 'Hide the suggestions rail on Home', 'hideSidebar', function () { applyPageStyles(); }));
