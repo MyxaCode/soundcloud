@@ -34,6 +34,15 @@ const DEFAULT_CONFIG = {
   hideUpsell: false,
   hideSidebar: false,
   vizOnPage: false,
+  vizFloat: false,
+  vizX: 50,
+  vizY: 86,
+  vizW: 560,
+  vizH: 92,
+  vizRainbow: true,
+  vizMirror: false,
+  vizCaps: true,
+  vizOpacity: 0.85,
   cssThemes: []
 };
 
