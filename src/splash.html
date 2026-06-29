@@ -9,51 +9,43 @@
     -webkit-user-select: none; user-select: none; }
   .card {
     width: 100%; height: 100%;
-    background: radial-gradient(130% 130% at 18% 0%, #161618 0%, #0c0c0d 60%);
+    background: #101012;
     border-radius: 16px; border: 1px solid rgba(255,255,255,.06);
+    box-shadow: 0 24px 60px rgba(0,0,0,.5);
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 18px; position: relative; overflow: hidden;
+    gap: 16px; position: relative; overflow: hidden;
   }
-  .logo { width: 56px; height: 56px; display: block; }
-  .name { font-size: 19px; font-weight: 700; color: #f4f4f5; letter-spacing: .2px; }
-  .wave { position: relative; width: 230px; height: 34px; }
-  .layer { position: absolute; inset: 0; display: flex; align-items: center; gap: 2px; }
-  .layer span { flex: 1; min-width: 2px; border-radius: 2px; }
-  .fill { animation: reveal 1.35s cubic-bezier(.45,0,.2,1) infinite alternate; }
-  @keyframes reveal { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+  .badge {
+    width: 60px; height: 60px; border-radius: 15px;
+    background: linear-gradient(180deg, #ff7a2f, #ff3d00);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 8px 22px rgba(255,72,0,.32);
+  }
+  .badge svg { width: 38px; height: 38px; display: block; }
+  .name { font-size: 18px; font-weight: 600; color: #f2f2f3; letter-spacing: .2px; }
+  .name b { font-weight: 700; }
+  .track { width: 168px; height: 3px; border-radius: 3px; background: #232326; overflow: hidden; position: relative; margin-top: 2px; }
+  .track i { position: absolute; top: 0; left: 0; height: 100%; width: 40%; border-radius: 3px;
+    background: linear-gradient(90deg, #ff7a2f, #ff3d00);
+    animation: slide 1.15s cubic-bezier(.5,.05,.3,1) infinite; }
+  @keyframes slide { 0% { left: -42%; } 100% { left: 102%; } }
 </style>
 </head>
 <body>
   <div class="card">
-    <svg class="logo" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
-      <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#ff7800"/><stop offset="1" stop-color="#ff4400"/>
-      </linearGradient></defs>
-      <rect width="256" height="256" rx="56" fill="url(#g)"/>
-      <g fill="#fff">
-        <rect x="26" y="145" width="10" height="33" rx="5"/><rect x="41" y="130" width="10" height="48" rx="5"/>
-        <rect x="56" y="140" width="10" height="38" rx="5"/><rect x="71" y="122" width="10" height="56" rx="5"/>
-        <rect x="86" y="109" width="10" height="69" rx="5"/><rect x="101" y="96" width="10" height="82" rx="5"/>
-        <rect x="116" y="87" width="10" height="91" rx="5"/><rect x="131" y="82" width="10" height="96" rx="5"/>
-        <rect x="146" y="85" width="10" height="93" rx="5"/><rect x="161" y="92" width="10" height="86" rx="5"/>
-        <rect x="176" y="103" width="10" height="75" rx="5"/><rect x="191" y="118" width="10" height="60" rx="5"/>
-        <rect x="206" y="134" width="10" height="44" rx="5"/><rect x="221" y="144" width="10" height="34" rx="5"/>
-      </g>
-    </svg>
-    <div class="name">SoundCloud</div>
-    <div class="wave">
-      <div class="layer base" id="base"></div>
-      <div class="layer fill" id="fill"></div>
+    <div class="badge">
+      <svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+        <g fill="#fff">
+          <rect x="74" y="150" width="112" height="34" rx="17"/>
+          <circle cx="86" cy="152" r="30"/>
+          <circle cx="120" cy="132" r="50"/>
+          <circle cx="160" cy="140" r="44"/>
+          <circle cx="186" cy="156" r="28"/>
+        </g>
+      </svg>
     </div>
+    <div class="name">Sound<b>Cloud</b></div>
+    <div class="track"><i></i></div>
   </div>
-  <script>
-    var H = [.30,.52,.40,.68,.55,.82,.60,.92,.50,.36,.62,.86,.54,.72,.42,.60,.95,.50,.76,.46,
-             .64,.82,.52,.34,.58,.70,.90,.60,.42,.66,.50,.80,.46,.62,.36,.72,.56,.50,.74,.40];
-    function build(el, color) {
-      H.forEach(function (h) { var s = document.createElement('span'); s.style.height = Math.round(h * 100) + '%'; s.style.background = color; el.appendChild(s); });
-    }
-    build(document.getElementById('base'), '#2a2a2e');
-    build(document.getElementById('fill'), '#ff5500');
-  </script>
 </body>
 </html>

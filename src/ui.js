@@ -310,8 +310,9 @@
       '.header,.header__middle,.header__right,.header__left{background-color:' + head + '!important;border-color:' + line + '!important}',
       '.header{border-bottom:1px solid ' + line + '!important}',
       '.commentForm__input,.sc-input,.searchField,.headerSearch__formInputWrapper,textarea.commentForm__input,.search__input,input.sc-input{background-color:' + bar + '!important;border-color:' + line + '!important;color:' + tx + '!important}',
-      '.playControls,.playControls__inner,.playControls__bg,.playControls__elements{background-color:' + bar + '!important}',
-      '.playControls{border-top:1px solid ' + line + '!important;box-shadow:0 -6px 26px hsla(' + hh + ',55%,40%,.18)!important}',
+      '.playControls{background-color:' + bar + '!important;border-top:1px solid ' + line + '!important;box-shadow:0 -6px 26px hsla(' + hh + ',55%,40%,.18)!important}',
+      '.playControls *:not(.playbackTimeline__progressBar):not(.playbackTimeline__progressHandle):not(.playbackTimeline__progressBackground):not([class*="sc-button"]):not(button):not(.sc-artwork){background-color:transparent!important}',
+      '.playControls .sc-button-icon,.playControls .playControl,.playControls__elements .sc-button{background-color:transparent!important}',
       '.sc-button:not(.sc-button-play):not(.sc-button-cta):not(.sc-button-like):not(.sc-button-repost):not(.sc-button-more):not(.sc-button-icon),.sc-button-medium,.sc-button-small,.sc-button-follow,.followButton{background-color:' + card + '!important;color:' + tx + '!important;border-color:' + line + '!important}',
       '.sc-text-h1,.sc-text-h2,.sc-text-h3,.sc-text-h4,.sc-text-primary,.sc-text-body,.sc-link-dark,.soundTitle__title,.trackItem__trackTitle,.profileHeaderInfo__userName,.fullHero__title,[class*="title"],[class*="Title"],[class*="username"],[class*="Username"],[class*="heading"],[class*="Heading"],.header__link,.g-tabs-link{color:' + tx + '!important}',
       '.sc-text-secondary,.sc-text-light,.sc-link-light,.sc-text-grey,.sc-ministats,.sound__soundTime,[class*="secondary"],[class*="Secondary"],[class*="caption"],[class*="Caption"]{color:' + txd + '!important}',
@@ -405,15 +406,16 @@
     return e;
   }
   function cloudSvg(orangeBg) {
-    var heights = [0.34, 0.50, 0.40, 0.58, 0.72, 0.85, 0.95, 1.0, 0.97, 0.90, 0.78, 0.62, 0.46, 0.36];
-    var barW = 10, gap = 5, baseY = 178, maxH = 96, S = 256;
-    var n = heights.length, totalW = n * barW + (n - 1) * gap, startX = (S - totalW) / 2, bars = '';
-    for (var i = 0; i < n; i++) {
-      var h = Math.round(heights[i] * maxH), x = Math.round(startX + i * (barW + gap)), y = baseY - h;
-      bars += '<rect x="' + x + '" y="' + y + '" width="' + barW + '" height="' + h + '" rx="5"/>';
-    }
-    var bg = orangeBg ? '<defs><linearGradient id="scg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff7800"/><stop offset="1" stop-color="#ff4400"/></linearGradient></defs><rect width="256" height="256" rx="56" fill="url(#scg)"/>' : '';
-    return '<svg viewBox="0 0 256 256" width="30" height="30" xmlns="http://www.w3.org/2000/svg">' + bg + '<g fill="' + (orangeBg ? '#fff' : '#ff5500') + '">' + bars + '</g></svg>';
+    var fill = orangeBg ? '#fff' : '#ff5500';
+    var bg = orangeBg ? '<defs><linearGradient id="scg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff7a2f"/><stop offset="1" stop-color="#ff3d00"/></linearGradient></defs><rect width="256" height="256" rx="58" fill="url(#scg)"/>' : '';
+    var cloud = '<g fill="' + fill + '">'
+      + '<rect x="74" y="150" width="112" height="34" rx="17"/>'
+      + '<circle cx="86" cy="152" r="30"/>'
+      + '<circle cx="120" cy="132" r="50"/>'
+      + '<circle cx="160" cy="140" r="44"/>'
+      + '<circle cx="186" cy="156" r="28"/>'
+      + '</g>';
+    return '<svg viewBox="0 0 256 256" width="30" height="30" xmlns="http://www.w3.org/2000/svg">' + bg + cloud + '</svg>';
   }
   function sliderFill(input) {
     if (!input) return;
