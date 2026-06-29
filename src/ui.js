@@ -161,10 +161,20 @@
     '::-webkit-scrollbar-track{background:transparent}',
     '::-webkit-scrollbar-thumb{background:#28282b;border-radius:6px}',
     '::-webkit-scrollbar-thumb:hover{background:#37373b}',
-    '#ss-panel{--ss-accent:#ff5500;position:fixed;top:0;right:0;height:100%;width:384px;z-index:2147483646;box-sizing:border-box;',
-    'background:linear-gradient(180deg,#111113,#0c0c0d);border-left:1px solid #202023;color:#ededed;font:13px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;box-shadow:-22px 0 60px rgba(0,0,0,.5);',
-    'overflow-y:auto;overflow-x:hidden;transform:translateX(101%);transition:transform .28s cubic-bezier(.16,1,.3,1);padding-bottom:34px}',
+    '#ss-panel{--ss-accent:#ff5500;position:fixed;top:0;right:0;height:100%;width:396px;z-index:2147483646;box-sizing:border-box;',
+    'background:#0e0e10;border-left:1px solid #202023;color:#ededed;font:13px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;box-shadow:-22px 0 60px rgba(0,0,0,.5);',
+    'overflow:hidden;display:flex;flex-direction:column;transform:translateX(101%);transition:transform .28s cubic-bezier(.16,1,.3,1)}',
     '#ss-panel.open{transform:none}',
+    '#ss-panel .ss-body{flex:1;display:flex;min-height:0}',
+    '#ss-panel .ss-rail{flex:0 0 66px;background:#0a0a0b;border-right:1px solid #1a1a1d;display:flex;flex-direction:column;padding:8px 0;gap:1px;overflow-y:auto}',
+    '#ss-panel .ss-tab{background:none;border:none;color:#74747a;cursor:pointer;padding:9px 4px 7px;display:flex;flex-direction:column;align-items:center;gap:4px;transition:.14s;position:relative;font-family:inherit}',
+    '#ss-panel .ss-tab svg{width:20px;height:20px;display:block}',
+    '#ss-panel .ss-tab span{font-size:8.5px;font-weight:600;letter-spacing:.2px;white-space:nowrap}',
+    '#ss-panel .ss-tab:hover{color:#bfbfc5;background:#131315}',
+    '#ss-panel .ss-tab.on{color:var(--ss-accent)}',
+    '#ss-panel .ss-tab.on:before{content:"";position:absolute;left:0;top:7px;bottom:7px;width:3px;border-radius:0 2px 2px 0;background:var(--ss-accent)}',
+    '#ss-panel .ss-content{flex:1;overflow-y:auto;overflow-x:hidden;min-width:0;padding-bottom:30px}',
+    '#ss-panel .ss-page > .ss-sec:first-child{border-top:none}',
     '#ss-panel *{box-sizing:border-box}',
     '#ss-panel ::selection{background:var(--ss-accent);color:#fff}',
     '@keyframes ssRB{0%{background-position:0 0}100%{background-position:300% 0}}',
@@ -172,7 +182,7 @@
     '@keyframes ssSway{0%,100%{transform:rotate(-3.5deg)}50%{transform:rotate(3.5deg)}}',
     '@keyframes ssPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}',
     '@keyframes ssDrift{0%,100%{transform:translate(0,0)}25%{transform:translate(9px,-11px)}50%{transform:translate(-7px,-17px)}75%{transform:translate(-10px,-7px)}}',
-    '#ss-panel .ss-top{display:flex;align-items:center;gap:11px;padding:17px 20px;border-bottom:1px solid #1b1b1e;position:sticky;top:0;background:rgba(15,15,16,.86);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);z-index:5}',
+    '#ss-panel .ss-top{display:flex;align-items:center;gap:11px;padding:15px 18px;border-bottom:1px solid #1a1a1d;flex:0 0 auto;background:#0e0e10;z-index:5}',
     '#ss-panel .ss-logo{width:30px;height:30px;flex:0 0 auto;display:block}',
     '#ss-panel .ss-ttl{flex:1;line-height:1.15;min-width:0}',
     '#ss-panel .ss-ttl b{display:block;font-size:14.5px;font-weight:700;color:#fff;letter-spacing:.2px}',
@@ -462,7 +472,7 @@
     return row;
   }
 
-  var panel, eqCanvas, presetSel, boostVal, preview, swatchWrap, vizCanvas, decorList;
+  var panel, eqCanvas, presetSel, boostVal, preview, swatchWrap, vizCanvas, decorList, activeTab = 'discord';
   var boostInpRef, bassInpRef;
 
   function addImage() {
@@ -542,6 +552,17 @@
     applyPageStyles();
   }
 
+  var SVGA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">';
+  var ICONS = {
+    discord: SVGA + '<path d="M20 4H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h3v3l4-3h9a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1z"/></svg>',
+    look: SVGA + '<path d="M12 3c4 4 6 7 6 10a6 6 0 0 1-12 0c0-3 2-6 6-10z"/></svg>',
+    decor: SVGA + '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.4"/><path d="M4.5 18l5-5 4 4 2-2 4 4"/></svg>',
+    audio: SVGA + '<path d="M5 21v-7M5 10V3M12 21v-9M12 8V3M19 21v-5M19 12V3"/><circle cx="5" cy="12" r="1.9"/><circle cx="12" cy="10" r="1.9"/><circle cx="19" cy="14" r="1.9"/></svg>',
+    viz: SVGA + '<path d="M5 20V10M9.7 20V5M14.3 20V13M19 20V8"/></svg>',
+    now: SVGA + '<circle cx="12" cy="12" r="9"/><path d="M10.2 8.5l5 3.5-5 3.5z" fill="currentColor" stroke="none"/></svg>',
+    gear: SVGA + '<circle cx="12" cy="12" r="3.1"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.4 5.4l1.7 1.7M16.9 16.9l1.7 1.7M18.6 5.4l-1.7 1.7M7.1 16.9l-1.7 1.7"/></svg>'
+  };
+
   function buildPanel() {
     injectCss();
     panel = el('div', { id: 'ss-panel' });
@@ -555,13 +576,43 @@
     var x = el('div', { class: 'ss-x' }, '✕'); x.addEventListener('click', closePanel); top.appendChild(x);
     panel.appendChild(top);
 
+    var body = el('div', { class: 'ss-body' });
+    var rail = el('div', { class: 'ss-rail' });
+    var content = el('div', { class: 'ss-content' });
+    var pages = {}, firstTab = null;
+    function addTab(id, label, icon) {
+      var b = el('button', { class: 'ss-tab' }); b.setAttribute('data-tab', id); b.title = label;
+      b.innerHTML = icon + '<span>' + label + '</span>';
+      b.addEventListener('click', function () { selectTab(id); });
+      rail.appendChild(b);
+      var pg = el('div', { class: 'ss-page' }); pg.setAttribute('data-page', id);
+      pages[id] = pg; content.appendChild(pg);
+      if (!firstTab) firstTab = id;
+      return pg;
+    }
+    function selectTab(id) {
+      Array.prototype.forEach.call(rail.children, function (b) { b.classList.toggle('on', b.getAttribute('data-tab') === id); });
+      for (var k in pages) pages[k].style.display = (k === id) ? '' : 'none';
+      content.scrollTop = 0; activeTab = id;
+      if (id === 'audio') { drawEq(); sliderFill(boostInpRef); sliderFill(bassInpRef); }
+      if (id === 'viz') resizeViz();
+    }
+    panel._selectTab = selectTab;
+    var pgDiscord = addTab('discord', 'Discord', ICONS.discord);
+    var pgLook = addTab('look', 'Look', ICONS.look);
+    var pgDecor = addTab('decor', 'Decor', ICONS.decor);
+    var pgAudio = addTab('audio', 'Audio', ICONS.audio);
+    var pgViz = addTab('viz', 'Visualizer', ICONS.viz);
+    var pgNow = addTab('now', 'Playing', ICONS.now);
+    var pgGeneral = addTab('general', 'General', ICONS.gear);
+
     var dsc = section('Discord');
     dsc.appendChild(toggleRow('Rich Presence', 'Show your track on your Discord profile', 'richPresence'));
     dsc.appendChild(toggleRow('Show when paused', null, 'displayWhenPaused'));
     dsc.appendChild(toggleRow('Small icon', 'Logo with caption under the artwork', 'displaySmallIcon'));
     dsc.appendChild(toggleRow('Profile button', '"Listen on SoundCloud" button on your Discord profile', 'displayButtons'));
     dsc.appendChild(buildPreview());
-    panel.appendChild(dsc);
+    pgDiscord.appendChild(dsc);
 
     var aps = section('Appearance');
     swatchWrap = el('div', { id: 'ss-themes' });
@@ -589,7 +640,7 @@
     aps.appendChild(toggleRow('Hide footer', 'Hide the GO MOBILE / legal footer', 'hideFooter', function () { applyPageStyles(); }));
     aps.appendChild(toggleRow('Hide banners', 'Hide upgrade and promo banners', 'hideUpsell', function () { applyPageStyles(); }));
     aps.appendChild(toggleRow('Hide right sidebar', 'Hide the suggestions rail on Home', 'hideSidebar', function () { applyPageStyles(); }));
-    panel.appendChild(aps);
+    pgLook.appendChild(aps);
 
     var dec = section('Decorations');
     var addBtn = el('button', { id: 'ss-decor-add' }, '+  Add image');
@@ -605,7 +656,7 @@
     dec.appendChild(editBtn);
     decorList = el('div', { id: 'ss-decor-list' });
     dec.appendChild(decorList);
-    panel.appendChild(dec);
+    pgDecor.appendChild(dec);
 
     var eqs = section('Equalizer');
     eqs.appendChild(toggleRow('Enable equalizer', null, 'eqEnabled', function () { applyEq(); drawEq(); }));
@@ -636,7 +687,7 @@
     });
     bassInpRef.addEventListener('wheel', function (ev) { ev.preventDefault(); }, { passive: false });
     bassRow.appendChild(bassInpRef); bassRow.appendChild(bbVal); eqs.appendChild(bassRow);
-    panel.appendChild(eqs);
+    pgAudio.appendChild(eqs);
 
     var vbs = section('Volume Boost');
     var brow = el('div', { id: 'ss-boost-row' });
@@ -648,7 +699,7 @@
       sliderFill(boostInpRef); applyBoost(); save({ volumeBoost: config.volumeBoost });
     });
     brow.appendChild(boostInpRef); brow.appendChild(boostVal); vbs.appendChild(brow);
-    panel.appendChild(vbs);
+    pgAudio.appendChild(vbs);
 
     var viz = section('Visualizer');
     viz.appendChild(toggleRow('Live audio visualizer', 'Real-time spectrum of what is playing', 'viz', function () {}));
@@ -681,9 +732,13 @@
     viz.appendChild(vizSlider('Width', 'vizW', 240, 1400, 10, 'px'));
     viz.appendChild(vizSlider('Height', 'vizH', 40, 260, 4, 'px'));
     viz.appendChild(vizSlider('Opacity', 'vizOpacity', 30, 100, 5, '%', true));
-    panel.appendChild(viz);
+    pgViz.appendChild(viz);
 
-    var adv = section('Advanced');
+    var now = section('Now Playing');
+    now.appendChild(el('div', { class: 'ss-d', style: 'line-height:1.5' }, 'Lyrics, a fullscreen mode and a mini player land here in the next update.'));
+    pgNow.appendChild(now);
+
+    var adv = section('General');
     adv.appendChild(toggleRow('Minimize to tray', 'Closing the window hides it to the tray', 'minimizeToTray'));
     adv.appendChild(toggleRow('Ad blocker', 'Applies after restart', 'adBlock'));
 
@@ -721,9 +776,12 @@
     });
     cssBtns.appendChild(cssSave); cssBtns.appendChild(nameInp); cssBtns.appendChild(saveTheme);
     adv.appendChild(cssBtns);
-    panel.appendChild(adv);
+    pgGeneral.appendChild(adv);
 
+    body.appendChild(rail); body.appendChild(content);
+    panel.appendChild(body);
     document.body.appendChild(panel);
+    selectTab(firstTab);
     applyAccent(); applyRainbow();
     drawEq(); sliderFill(boostInpRef); sliderFill(bassInpRef);
     buildDecorList(); renderDecor();
