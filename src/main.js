@@ -35,11 +35,11 @@ const DEFAULT_CONFIG = {
   hideSidebar: false,
   clearHeader: true,
   vizOnPage: false,
-  vizFloat: false,
-  vizX: 50,
-  vizY: 86,
-  vizW: 560,
-  vizH: 92,
+  vizFloat: true,
+  vizX: 80,
+  vizY: 66,
+  vizW: 380,
+  vizH: 120,
   vizRainbow: true,
   vizMirror: false,
   vizCaps: true,
@@ -60,10 +60,21 @@ function loadConfig() {
     }
     const data = JSON.parse(fs.readFileSync(p, 'utf8'));
     const merged = { ...DEFAULT_CONFIG, ...data };
+    let dirty = false;
     if (!merged.discordClientId || merged.discordClientId === '0000000000000000000') {
       merged.discordClientId = DEFAULT_CONFIG.discordClientId;
-      try { fs.writeFileSync(p, JSON.stringify(merged, null, 2), 'utf8'); } catch (e) {}
+      dirty = true;
     }
+    if (!merged.vizMigrated2) {
+      merged.vizFloat = true;
+      merged.vizX = 80;
+      merged.vizY = 66;
+      merged.vizW = 380;
+      merged.vizH = 120;
+      merged.vizMigrated2 = true;
+      dirty = true;
+    }
+    if (dirty) { try { fs.writeFileSync(p, JSON.stringify(merged, null, 2), 'utf8'); } catch (e) {} }
     return merged;
   } catch (e) {
     console.error('[config] failed, using defaults:', e.message);

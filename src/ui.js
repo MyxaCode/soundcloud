@@ -39,9 +39,9 @@
     hideSidebar: false,
     clearHeader: true,
     vizOnPage: false,
-    vizFloat: false,
-    vizX: 50, vizY: 86,
-    vizW: 560, vizH: 92,
+    vizFloat: true,
+    vizX: 80, vizY: 66,
+    vizW: 380, vizH: 120,
     vizRainbow: true,
     vizMirror: false,
     vizCaps: true,
@@ -296,27 +296,29 @@
   function scThemeCss() {
     var a = config.accent, hsl = hexToHsl(a), hh = Math.round(hsl.h);
     var rot = Math.round(hsl.h - 16);
-    var deep = 'hsl(' + hh + ',22%,9%)';
-    var card = 'hsl(' + hh + ',18%,12.5%)';
-    var head = 'hsl(' + hh + ',20%,14.5%)';
+    var deep = 'hsl(' + hh + ',23%,8.5%)';
+    var card = 'hsl(' + hh + ',19%,13%)';
+    var head = 'hsl(' + hh + ',21%,11%)';
     var bar  = 'hsl(' + hh + ',22%,12%)';
-    var line = 'hsl(' + hh + ',26%,23%)';
-    var tx   = 'hsl(' + hh + ',14%,92%)';
-    var txd  = 'hsl(' + hh + ',10%,64%)';
+    var line = 'hsl(' + hh + ',24%,22%)';
+    var tx   = 'hsl(' + hh + ',13%,93%)';
+    var txd  = 'hsl(' + hh + ',10%,66%)';
     return [
-      'html,body,#app,.l-container,.l-content,#content,.l-fixed-content,.l-listen,.l-listen-content,.l-account,.l-about,.l-search,.l-charts,.charts,.stream,.stream__content,.userStream,.userStream__content,.userMain,.searchContainer,.search,.search__content,.fullHero,.collection,.collectionView,.l-listen-hero,.l-profile{background-color:' + deep + '!important}',
-      '.header,.header__middle,.header__right,.header__left{background:' + head + '!important;border-color:' + line + '!important}',
+      'html,body,#app,#content,.l-fixed-content,[class^="l-"],[class*=" l-"]{background-color:' + deep + '!important}',
+      '.sidebarModule,.sidebarModule__content,.sidebarHeader,[class*="Module"],[class*="module__"],[class*="Card"],[class*="card__"],[class*="Panel"],[class*="panel__"],[class*="Hero"],[class*="hero__"],[class*="Rail"],[class*="Shortcut"],[class*="shortcut"],[class*="Insights"],[class*="insights"],[class*="Dashboard"],[class*="dashboard"],[class*="Tool"],[class*="tool__"],[class*="Banner"],[class*="banner__"],[class*="upsell"],[class*="Upsell"],[class*="Tier"],[class*="tier__"],.trackItem,.soundBadge,.soundList__item,.trackList__item,.sound__body,.compactTrackList,.compactTrackList__item,.comment,.commentsList,.commentForm,.modal__modal,.modal__content,.modal__header,.modal__footer,.g-modal-dialog,.dropdownMenu,.moreActions,.linkMenu,.profileMenu,.headerMenu,.queue,.queue__panel,.queue__header,.statsBar,.g-tabs,.tabs,.searchInlineResults,.audibleTitle{background-color:' + card + '!important;border-color:' + line + '!important}',
+      '[class*="Hero"],[class*="hero"],[class*="Shortcut"],[class*="shortcut"],[class*="latestUpload"],[class*="LatestUpload"],[class*="artistTools"],[class*="ArtistTools"],[class*="audienceInsights"]{background-image:none!important}',
+      '.header,.header__middle,.header__right,.header__left{background-color:' + head + '!important;border-color:' + line + '!important}',
       '.header{border-bottom:1px solid ' + line + '!important}',
-      '.soundList__item,.trackList__item,.soundBadge,.trackItem,.sound__body,.sidebarModule,.sidebarModule__content,.sidebarHeader,.modal__modal,.modal__content,.modal__header,.modal__footer,.g-modal-dialog,.dropdownMenu,.moreActions,.linkMenu,.profileMenu,.headerMenu,.queue,.queue__panel,.queue__header,.compactTrackList,.compactTrackList__item,.commentsList,.comment,.commentForm,.systemPlaylistBannerItem,.upsellBanner,.tierUpgrade,.banner,.g-tabs,.tabs,.statsBar,.searchInlineResults{background-color:' + card + '!important;border-color:' + line + '!important}',
-      '.commentForm__input,.sc-input,.searchField,.headerSearch__formInputWrapper,textarea.commentForm__input,.search__input{background-color:' + bar + '!important;border-color:' + line + '!important;color:' + tx + '!important}',
-      '.playControls,.playControls__inner,.playControls__bg,.playControls__elements{background:' + bar + '!important}',
+      '.commentForm__input,.sc-input,.searchField,.headerSearch__formInputWrapper,textarea.commentForm__input,.search__input,input.sc-input{background-color:' + bar + '!important;border-color:' + line + '!important;color:' + tx + '!important}',
+      '.playControls,.playControls__inner,.playControls__bg,.playControls__elements{background-color:' + bar + '!important}',
       '.playControls{border-top:1px solid ' + line + '!important;box-shadow:0 -6px 26px hsla(' + hh + ',55%,40%,.18)!important}',
-      '.soundTitle__title,.sc-text-h1,.sc-text-h2,.sc-text-h3,.sc-text-primary,.sc-link-dark,.trackItem__trackTitle,.sidebarHeader__title,.fullHero__title,.profileHeaderInfo__userName,.audibleTitle,.commentItem__body,.g-tabs-link,.headerMenu__link{color:' + tx + '!important}',
-      '.sc-text-secondary,.sc-text-light,.sc-link-light,.soundTitle__usernameText,.trackItem__username,.sc-ministats,.sound__soundTime,.sc-text-grey{color:' + txd + '!important}',
-      '.sc-button-play,.playButton,.sc-button-cta,.waveform__layer,.sc-button-like.sc-button-selected,.sc-button-repost.sc-button-selected,.uploadButton,.sc-button-follow.sc-button-selected,.tierUpgrade__button,.systemPlaylistBannerItem__action .sc-button{filter:hue-rotate(' + rot + 'deg) saturate(1.06)!important}',
-      '.playbackTimeline__progressBackground{background:' + line + '!important}',
+      '.sc-button:not(.sc-button-play):not(.sc-button-cta):not(.sc-button-like):not(.sc-button-repost):not(.sc-button-more):not(.sc-button-icon),.sc-button-medium,.sc-button-small,.sc-button-follow,.followButton{background-color:' + card + '!important;color:' + tx + '!important;border-color:' + line + '!important}',
+      '.sc-text-h1,.sc-text-h2,.sc-text-h3,.sc-text-h4,.sc-text-primary,.sc-text-body,.sc-link-dark,.soundTitle__title,.trackItem__trackTitle,.profileHeaderInfo__userName,.fullHero__title,[class*="title"],[class*="Title"],[class*="username"],[class*="Username"],[class*="heading"],[class*="Heading"],.header__link,.g-tabs-link{color:' + tx + '!important}',
+      '.sc-text-secondary,.sc-text-light,.sc-link-light,.sc-text-grey,.sc-ministats,.sound__soundTime,[class*="secondary"],[class*="Secondary"],[class*="caption"],[class*="Caption"]{color:' + txd + '!important}',
+      '.sc-button-play,.playButton,.sc-button-cta,.waveform__layer,.sc-button-like.sc-button-selected,.sc-button-repost.sc-button-selected,.uploadButton,.sc-button-follow.sc-button-selected{filter:hue-rotate(' + rot + 'deg) saturate(1.05)!important}',
+      '.playbackTimeline__progressBackground{background-color:' + line + '!important}',
       '.playbackTimeline__progressHandle{background:#fff!important;box-shadow:0 0 9px ' + a + '!important}',
-      'a:hover,.soundTitle__title:hover,.playbackSoundBadge__titleLink:hover,.sc-link-light:hover,.sc-link-primary:hover,.g-tabs-link.active,.headerMenu__link:hover{color:' + a + '!important}',
+      'a:hover,.soundTitle__title:hover,.playbackSoundBadge__titleLink:hover,.sc-link-light:hover,.sc-link-primary:hover,.g-tabs-link.active,.header__link:hover{color:' + a + '!important}',
       '.g-tabs-link.active:after,.tabs__tab.active:after{background:' + a + '!important}',
       '::selection{background:' + a + ';color:#fff}',
       '::-webkit-scrollbar{width:11px;height:11px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:' + a + ';border-radius:8px;border:2px solid ' + deep + '}'
@@ -654,6 +656,7 @@
     viz.appendChild(toggleRow('Rainbow colors', 'Spread the spectrum across the rainbow', 'vizRainbow', function () {}));
     viz.appendChild(toggleRow('Mirror', 'Reflect the bars from the center', 'vizMirror', function () {}));
     viz.appendChild(toggleRow('Peak caps', 'Falling markers on top of each bar', 'vizCaps', function () {}));
+    viz.appendChild(el('div', { class: 'ss-d', style: 'margin:12px 0 2px;line-height:1.45' }, 'Tip: while this menu is open, drag the visualizer window anywhere on the page. Use Dock to stretch it across the bottom instead.'));
     var moveBtn = el('button', { id: 'ss-viz-move' }, 'Move on page: OFF');
     moveBtn.addEventListener('click', function () {
       vizEdit = !vizEdit;
@@ -842,15 +845,18 @@
     var rgb = hexToRgb(config.accent), dl = data ? data.length : 0;
     var caps = canvas._caps;
     if (!caps || caps.length !== bars) caps = canvas._caps = new Float32Array(bars);
-    var bw = w / bars, gap = bw > 6 ? 2 : 1, bwr = Math.max(1, bw - gap);
+    var bw = w / bars, gap = bw > 7 ? 1.6 : 1, bwr = Math.max(1, bw - gap);
     var mid = h / 2, t = Date.now() / 600;
     for (var i = 0; i < bars; i++) {
       var v;
-      if (data) { v = data[Math.floor(Math.pow(i / bars, 1.35) * dl * 0.78)] / 255; }
-      else v = 0.05 + 0.04 * Math.sin(i * 0.45 + t) + 0.03 * Math.sin(i * 0.13 - t * 0.7);
-      v = Math.max(0.02, Math.min(1, v));
-      ctx.fillStyle = opt.rainbow ? 'hsl(' + Math.round(i / bars * 300) + ',92%,60%)'
+      if (data) { v = data[Math.floor(Math.pow(i / bars, 1.32) * dl * 0.82)] / 255; }
+      else v = 0.16 + 0.13 * Math.sin(i * 0.5 + t) + 0.09 * Math.sin(i * 0.17 - t * 0.7);
+      v = Math.pow(Math.max(0, v), 0.72);
+      v = Math.max(0.06, Math.min(1, v));
+      var col = opt.rainbow ? 'hsl(' + Math.round(i / bars * 300) + ',92%,61%)'
         : 'rgb(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ')';
+      ctx.fillStyle = col;
+      ctx.shadowColor = col; ctx.shadowBlur = opt.glow ? 6 : 0;
       var x = i * bw + gap / 2;
       if (opt.mirror) {
         var bh = v * (mid - 1);
@@ -860,6 +866,7 @@
         var bh2 = v * (h - 2);
         barPath(ctx, x, h - bh2, bwr, bh2);
       }
+      ctx.shadowBlur = 0;
       if (opt.caps) {
         if (v >= caps[i]) caps[i] = v; else caps[i] = Math.max(0, caps[i] - 0.018);
         ctx.fillStyle = 'rgba(255,255,255,.85)';
@@ -879,9 +886,9 @@
     var needPage = config.vizOnPage && pageVizCanvas && pageVizCanvas.style.display !== 'none';
     if (!needMenu && !needPage) return;
     if ((vizFrame++ % 6) === 0) vizA = activeAnalyser();
-    var opt = { rainbow: config.vizRainbow !== false, mirror: !!config.vizMirror, caps: config.vizCaps !== false };
-    if (needMenu) { if (!vizCanvas.width) resizeViz(); drawSpectrum(vizCanvas, 48, opt); }
-    if (needPage) { var bars = Math.min(170, Math.max(40, Math.round(pageVizCanvas.width / 7))); drawSpectrum(pageVizCanvas, bars, opt); }
+    var opt = { rainbow: config.vizRainbow !== false, mirror: !!config.vizMirror, caps: config.vizCaps !== false, glow: true };
+    if (needMenu) { if (!vizCanvas.width) resizeViz(); drawSpectrum(vizCanvas, 56, opt); }
+    if (needPage) { var bars = Math.min(150, Math.max(40, Math.round(pageVizCanvas.width / 5))); drawSpectrum(pageVizCanvas, bars, { rainbow: opt.rainbow, mirror: opt.mirror, caps: opt.caps, glow: bars <= 110 }); }
   }
   function positionPageViz() {
     if (!pageVizCanvas) return;
@@ -889,17 +896,18 @@
     var w = floating ? Math.round(config.vizW) : window.innerWidth;
     var h = Math.round(config.vizH);
     pageVizCanvas.width = w; pageVizCanvas.height = h;
-    var s = 'position:fixed;z-index:8;opacity:' + (config.vizOpacity != null ? config.vizOpacity : 0.85) + ';';
-    if (floating) s += 'left:' + config.vizX + '%;top:' + config.vizY + '%;transform:translate(-50%,-50%);width:' + w + 'px;height:' + h + 'px;';
+    var grab = vizEdit || panelOpen;
+    var s = 'position:fixed;z-index:8;border-radius:12px;opacity:' + (config.vizOpacity != null ? config.vizOpacity : 0.85) + ';';
+    if (floating) s += 'left:' + config.vizX + '%;top:' + config.vizY + '%;transform:translate(-50%,-50%);width:' + w + 'px;height:' + h + 'px;background:rgba(10,10,12,.30);box-shadow:0 6px 22px rgba(0,0,0,.34);';
     else s += 'left:0;bottom:54px;width:100vw;height:' + h + 'px;';
-    s += vizEdit
-      ? 'pointer-events:auto;cursor:move;outline:2px dashed rgba(255,255,255,.55);outline-offset:4px;border-radius:10px;background:rgba(0,0,0,.18);'
+    s += grab
+      ? 'pointer-events:auto;cursor:move;outline:2px dashed rgba(255,255,255,.6);outline-offset:3px;'
       : 'pointer-events:none;';
     pageVizCanvas.style.cssText = s;
   }
   function setupPageVizDrag() {
     pageVizCanvas.addEventListener('mousedown', function (e) {
-      if (!vizEdit) return;
+      if (!vizEdit && !panelOpen) return;
       e.preventDefault(); e.stopPropagation();
       function move(ev) {
         config.vizFloat = true;
@@ -933,8 +941,8 @@
   }
 
   var panelOpen = false;
-  function openPanel() { if (panel) { panel.classList.add('open'); panelOpen = true; drawEq(); resizeViz(); } }
-  function closePanel() { if (panel) { panel.classList.remove('open'); panelOpen = false; } }
+  function openPanel() { if (panel) { panel.classList.add('open'); panelOpen = true; drawEq(); resizeViz(); if (config.vizOnPage && pageVizCanvas) positionPageViz(); } }
+  function closePanel() { if (panel) { panel.classList.remove('open'); panelOpen = false; if (config.vizOnPage && pageVizCanvas) positionPageViz(); } }
   function togglePanel() { panelOpen ? closePanel() : openPanel(); }
   document.addEventListener('keydown', function (e) {
     if (e.key === 'F1') { e.preventDefault(); e.stopPropagation(); togglePanel(); }
