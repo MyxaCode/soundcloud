@@ -44,6 +44,10 @@ const DEFAULT_CONFIG = {
   vizMirror: false,
   vizCaps: true,
   vizOpacity: 0.85,
+  vizStyle: 'bars',
+  fx8d: false,
+  fxReverb: 0,
+  speed: 100,
   cssThemes: []
 };
 

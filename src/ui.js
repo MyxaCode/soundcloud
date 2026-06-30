@@ -46,6 +46,10 @@
     vizMirror: false,
     vizCaps: true,
     vizOpacity: 0.85,
+    vizStyle: 'bars',
+    fx8d: false,
+    fxReverb: 0,
+    speed: 100,
     cssThemes: []
   };
 
@@ -100,6 +104,15 @@
   function dbToGain(db) { return Math.pow(10, (db || 0) / 20); }
 
   var eqChains = [];
+  function makeImpulse(ctx, seconds, decay) {
+    var rate = ctx.sampleRate, len = Math.max(1, Math.floor(rate * seconds));
+    var buf = ctx.createBuffer(2, len, rate);
+    for (var ch = 0; ch < 2; ch++) {
+      var d = buf.getChannelData(ch);
+      for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+    }
+    return buf;
+  }
   function buildChain(ctx) {
     var input = ctx.createGain();
     var filters = FREQS.map(function (f, i) {
@@ -112,14 +125,32 @@
     var bass = ctx.createBiquadFilter();
     bass.type = 'lowshelf'; bass.frequency.value = 110; bass.gain.value = config.bassBoost || 0;
     var boost = ctx.createGain(); boost.gain.value = dbToGain(config.volumeBoost || 0);
+    var panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
     var limiter = ctx.createDynamicsCompressor();
     limiter.threshold.value = -0.5; limiter.knee.value = 0; limiter.ratio.value = 12; limiter.attack.value = 0.001; limiter.release.value = 0.1;
+    var dry = ctx.createGain(); dry.gain.value = 1;
+    var wet = ctx.createGain(); wet.gain.value = (config.fxReverb || 0) / 100;
+    var conv = null;
+    try { conv = ctx.createConvolver(); conv.buffer = makeImpulse(ctx, 2.4, 2.6); } catch (e) {}
     var node = input;
     filters.forEach(function (flt) { node.connect(flt); node = flt; });
-    node.connect(bass); bass.connect(boost); boost.connect(limiter);
+    node.connect(bass); bass.connect(boost);
+    if (panner) boost.connect(panner);
+    var head = panner || boost;
+    head.connect(dry); dry.connect(limiter);
+    if (conv) { head.connect(conv); conv.connect(wet); wet.connect(limiter); }
+    var lfo = null, lfoGain = null;
+    if (panner && ctx.createOscillator) {
+      try {
+        lfo = ctx.createOscillator(); lfoGain = ctx.createGain();
+        lfo.type = 'sine'; lfo.frequency.value = 0.12;
+        lfoGain.gain.value = config.fx8d ? 0.92 : 0;
+        lfo.connect(lfoGain); lfoGain.connect(panner.pan); lfo.start();
+      } catch (e) {}
+    }
     var analyser = null;
     try { analyser = ctx.createAnalyser(); analyser.fftSize = 256; analyser.smoothingTimeConstant = 0.78; limiter.connect(analyser); } catch (e) {}
-    var chain = { input: input, output: limiter, filters: filters, bass: bass, boost: boost, analyser: analyser };
+    var chain = { input: input, output: limiter, filters: filters, bass: bass, boost: boost, panner: panner, wet: wet, dry: dry, lfo: lfo, lfoGain: lfoGain, analyser: analyser };
     eqChains.push(chain);
     return chain;
   }
@@ -130,6 +161,7 @@
     proto.createMediaElementSource = function (el) {
       var source = orig.call(this, el);
       try {
+        trackMediaEl(el);
         var chain = buildChain(this);
         var nConnect = AudioNode.prototype.connect;
         var nDisconnect = AudioNode.prototype.disconnect;
@@ -138,6 +170,7 @@
         source.disconnect = function () { try { return nDisconnect.apply(chain.output, arguments); } catch (e) { return nDisconnect.apply(source, arguments); } };
         log('hooked SC source; chains=' + eqChains.length);
       } catch (e) { log('hook err: ' + (e && e.message)); }
+      try { applySpeed(); } catch (e) {}
       return source;
     };
   }
@@ -155,6 +188,28 @@
   }
   function applyBoost() { for (var c = 0; c < eqChains.length; c++) eqChains[c].boost.gain.value = dbToGain(config.volumeBoost || 0); }
   function applyBass() { for (var c = 0; c < eqChains.length; c++) if (eqChains[c].bass) eqChains[c].bass.gain.value = config.bassBoost || 0; }
+  function applyFx8d() {
+    for (var c = 0; c < eqChains.length; c++) {
+      var ch = eqChains[c];
+      if (ch.lfoGain) ch.lfoGain.gain.value = config.fx8d ? 0.92 : 0;
+      if (ch.panner && !config.fx8d) { try { ch.panner.pan.value = 0; } catch (e) {} }
+    }
+  }
+  function applyReverb() { for (var c = 0; c < eqChains.length; c++) if (eqChains[c].wet) eqChains[c].wet.gain.value = (config.fxReverb || 0) / 100; }
+  var mediaEls = [];
+  function trackMediaEl(el) { if (el && mediaEls.indexOf(el) === -1) mediaEls.push(el); }
+  function applySpeed() {
+    var r = (config.speed || 100) / 100;
+    var list = [].slice.call(document.getElementsByTagName('audio'))
+      .concat([].slice.call(document.getElementsByTagName('video'))).concat(mediaEls);
+    for (var i = 0; i < list.length; i++) {
+      var m = list[i]; if (!m) continue;
+      try {
+        m.preservesPitch = false; m.mozPreservesPitch = false; m.webkitPreservesPitch = false;
+        if (Math.abs((m.playbackRate || 1) - r) > 0.001) m.playbackRate = r;
+      } catch (e) {}
+    }
+  }
 
   var CSS = [
     '::-webkit-scrollbar{width:9px;height:9px}',
@@ -471,6 +526,24 @@
     row.appendChild(inp); row.appendChild(val);
     return row;
   }
+  function rangeRow(label, key, mn, mx, st, fmt, onApply) {
+    var row = el('div', { class: 'ss-vrow' });
+    row.appendChild(el('div', { class: 'ss-vlbl' }, label));
+    var inp = el('input', { type: 'range', min: String(mn), max: String(mx), step: String(st) });
+    inp.value = config[key];
+    var val = el('div', { class: 'ss-vval' }, fmt(config[key]));
+    inp.addEventListener('input', function () {
+      config[key] = parseFloat(inp.value);
+      val.textContent = fmt(config[key]);
+      sliderFill(inp);
+      var p = {}; p[key] = config[key]; save(p);
+      if (onApply) onApply();
+    });
+    inp.addEventListener('wheel', function (ev) { ev.preventDefault(); }, { passive: false });
+    sliderFill(inp);
+    row.appendChild(inp); row.appendChild(val);
+    return row;
+  }
 
   var panel, eqCanvas, presetSel, boostVal, preview, swatchWrap, vizCanvas, decorList, activeTab = 'discord';
   var boostInpRef, bassInpRef;
@@ -701,10 +774,25 @@
     brow.appendChild(boostInpRef); brow.appendChild(boostVal); vbs.appendChild(brow);
     pgAudio.appendChild(vbs);
 
+    var fxs = section('Effects');
+    fxs.appendChild(toggleRow('8D audio', 'The sound slowly rotates around your head', 'fx8d', function () { applyFx8d(); }));
+    fxs.appendChild(rangeRow('Reverb', 'fxReverb', 0, 100, 5, function (v) { return Math.round(v) + '%'; }, applyReverb));
+    fxs.appendChild(rangeRow('Speed', 'speed', 50, 150, 1, function (v) { return (v / 100).toFixed(2) + 'x'; }, applySpeed));
+    fxs.appendChild(el('div', { class: 'ss-d', style: 'margin-top:9px;line-height:1.45' }, 'Speed above 1.00x gives a nightcore feel, below is slowed; the pitch follows the speed.'));
+    pgAudio.appendChild(fxs);
+
     var viz = section('Visualizer');
     viz.appendChild(toggleRow('Live audio visualizer', 'Real-time spectrum of what is playing', 'viz', function () {}));
     vizCanvas = el('canvas', { id: 'ss-viz' });
     viz.appendChild(vizCanvas);
+    var stRow = el('div', { class: 'ss-row' });
+    stRow.appendChild(el('div', { class: 'ss-l' }, 'Style'));
+    var stSel = el('select');
+    [['bars', 'Bars'], ['dots', 'Dots'], ['wave', 'Wave'], ['ring', 'Ring']].forEach(function (o) {
+      var op = el('option', { value: o[0] }, o[1]); if ((config.vizStyle || 'bars') === o[0]) op.selected = true; stSel.appendChild(op);
+    });
+    stSel.addEventListener('change', function () { config.vizStyle = stSel.value; save({ vizStyle: stSel.value }); });
+    stRow.appendChild(stSel); viz.appendChild(stRow);
     viz.appendChild(toggleRow('Show on SoundCloud', 'Draw the spectrum over the page', 'vizOnPage', function () { applyPageViz(); }));
     viz.appendChild(toggleRow('Rainbow colors', 'Spread the spectrum across the rainbow', 'vizRainbow', function () {}));
     viz.appendChild(toggleRow('Mirror', 'Reflect the bars from the center', 'vizMirror', function () {}));
@@ -900,6 +988,9 @@
     var w = canvas.width, h = canvas.height;
     if (!w || !h) return;
     ctx.clearRect(0, 0, w, h);
+    var style = opt.style || 'bars';
+    if (style === 'wave') { drawWave(ctx, w, h, opt); return; }
+    if (style === 'ring') { drawRing(ctx, w, h, bars, opt); return; }
     var a = vizA, data = null;
     if (a) { data = new Uint8Array(a.frequencyBinCount); a.getByteFrequencyData(data); }
     var rgb = hexToRgb(config.accent), dl = data ? data.length : 0;
@@ -918,7 +1009,15 @@
       ctx.fillStyle = col;
       ctx.shadowColor = col; ctx.shadowBlur = opt.glow ? 6 : 0;
       var x = i * bw + gap / 2;
-      if (opt.mirror) {
+      if (style === 'dots') {
+        var rr = Math.min(bwr / 2 + 0.5, 3.5);
+        if (opt.mirror) {
+          ctx.beginPath(); ctx.arc(x + bwr / 2, mid - v * (mid - 1), rr, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(x + bwr / 2, mid + v * (mid - 1), rr, 0, Math.PI * 2); ctx.fill();
+        } else {
+          ctx.beginPath(); ctx.arc(x + bwr / 2, h - v * (h - 2) - rr, rr, 0, Math.PI * 2); ctx.fill();
+        }
+      } else if (opt.mirror) {
         var bh = v * (mid - 1);
         barPath(ctx, x, mid - bh, bwr, bh);
         ctx.fillRect(x, mid, bwr, bh);
@@ -927,7 +1026,7 @@
         barPath(ctx, x, h - bh2, bwr, bh2);
       }
       ctx.shadowBlur = 0;
-      if (opt.caps) {
+      if (opt.caps && style !== 'dots') {
         if (v >= caps[i]) caps[i] = v; else caps[i] = Math.max(0, caps[i] - 0.018);
         ctx.fillStyle = 'rgba(255,255,255,.85)';
         if (opt.mirror) {
@@ -940,15 +1039,59 @@
       }
     }
   }
+  function drawWave(ctx, w, h, opt) {
+    var a = vizA, data = null;
+    if (a) { data = new Uint8Array(a.fftSize); a.getByteTimeDomainData(data); }
+    var rgb = hexToRgb(config.accent), n = data ? data.length : 96, t = Date.now() / 300;
+    if (opt.rainbow) {
+      var grad = ctx.createLinearGradient(0, 0, w, 0);
+      for (var s = 0; s <= 6; s++) grad.addColorStop(s / 6, 'hsl(' + Math.round(s / 6 * 300) + ',92%,61%)');
+      ctx.strokeStyle = grad;
+    } else ctx.strokeStyle = 'rgb(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ')';
+    ctx.lineWidth = 2.2; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.shadowColor = opt.rainbow ? 'hsl(190,90%,60%)' : 'rgb(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ')';
+    ctx.shadowBlur = opt.glow ? 7 : 0;
+    ctx.beginPath();
+    for (var i = 0; i < n; i++) {
+      var v = data ? (data[i] / 128 - 1) : Math.sin(i / n * Math.PI * 5 + t) * (0.25 + 0.12 * Math.sin(t));
+      var x = i / (n - 1) * w, y = h / 2 + v * (h / 2 - 3);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke(); ctx.shadowBlur = 0;
+  }
+  function drawRing(ctx, w, h, bars, opt) {
+    var a = vizA, data = null;
+    if (a) { data = new Uint8Array(a.frequencyBinCount); a.getByteFrequencyData(data); }
+    var rgb = hexToRgb(config.accent), dl = data ? data.length : 0, t = Date.now() / 500;
+    var cx = w / 2, cy = h / 2, R = Math.min(w, h) * 0.24, span = Math.min(w, h) * 0.22;
+    ctx.lineCap = 'round';
+    var lw = Math.max(1.6, 2 * Math.PI * R / bars - 1.5);
+    for (var i = 0; i < bars; i++) {
+      var tt = i / bars;
+      var v = data ? data[Math.floor(Math.pow(tt, 1.2) * dl * 0.8)] / 255 : 0.2 + 0.15 * Math.sin(i * 0.5 + t);
+      v = Math.max(0.05, Math.pow(Math.max(0, v), 0.8));
+      var ang = tt * Math.PI * 2 - Math.PI / 2;
+      var ca = Math.cos(ang), sa = Math.sin(ang), len = v * span;
+      ctx.strokeStyle = opt.rainbow ? 'hsl(' + Math.round(tt * 300) + ',92%,61%)' : 'rgb(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ')';
+      ctx.lineWidth = lw;
+      ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = opt.glow ? 5 : 0;
+      ctx.beginPath();
+      ctx.moveTo(cx + ca * R, cy + sa * R);
+      ctx.lineTo(cx + ca * (R + len), cy + sa * (R + len));
+      ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+  }
   function vizLoop() {
     requestAnimationFrame(vizLoop);
     var needMenu = panelOpen && config.viz && vizCanvas;
     var needPage = config.vizOnPage && pageVizCanvas && pageVizCanvas.style.display !== 'none';
     if (!needMenu && !needPage) return;
     if ((vizFrame++ % 6) === 0) vizA = activeAnalyser();
-    var opt = { rainbow: config.vizRainbow !== false, mirror: !!config.vizMirror, caps: config.vizCaps !== false, glow: true };
+    var style = config.vizStyle || 'bars';
+    var opt = { rainbow: config.vizRainbow !== false, mirror: !!config.vizMirror, caps: config.vizCaps !== false, glow: true, style: style };
     if (needMenu) { if (!vizCanvas.width) resizeViz(); drawSpectrum(vizCanvas, 56, opt); }
-    if (needPage) { var bars = Math.min(150, Math.max(40, Math.round(pageVizCanvas.width / 5))); drawSpectrum(pageVizCanvas, bars, { rainbow: opt.rainbow, mirror: opt.mirror, caps: opt.caps, glow: bars <= 110 }); }
+    if (needPage) { var bars = Math.min(150, Math.max(40, Math.round(pageVizCanvas.width / 5))); drawSpectrum(pageVizCanvas, bars, { rainbow: opt.rainbow, mirror: opt.mirror, caps: opt.caps, glow: bars <= 110, style: style }); }
   }
   function positionPageViz() {
     if (!pageVizCanvas) return;
@@ -1014,6 +1157,7 @@
   function mmss(s) { s = Math.max(0, Math.floor(s || 0)); var m = Math.floor(s / 60), r = s % 60; return m + ':' + (r < 10 ? '0' : '') + r; }
   function poll() {
     try {
+      if ((config.speed || 100) !== 100) applySpeed();
       if (config.images && config.images.length && !document.getElementById('ss-decor')) renderDecor();
       var titleEl = document.querySelector('.playbackSoundBadge__titleLink');
       if (!titleEl) { updatePreview(null); return; }
