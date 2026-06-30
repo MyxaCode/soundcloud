@@ -53,6 +53,7 @@ const DEFAULT_CONFIG = {
   globalHotkeys: true,
   autoAccent: false,
   lyrics: false,
+  miniPlayer: false,
   cssThemes: []
 };
 
@@ -109,6 +110,7 @@ let presence = null;
 let mainWindow = null;
 let splash = null;
 let tray = null;
+let miniWindow = null;
 
 const SC_URL = 'https://soundcloud.com/discover';
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
@@ -373,6 +375,33 @@ function setupTray() {
   });
 }
 
+function createMiniWindow() {
+  if (miniWindow) { miniWindow.show(); return; }
+  let x, y;
+  try {
+    const { screen } = require('electron');
+    const wa = screen.getPrimaryDisplay().workArea;
+    x = wa.x + wa.width - 360; y = wa.y + wa.height - 128;
+  } catch (e) {}
+  miniWindow = new BrowserWindow({
+    width: 344, height: 102, x: x, y: y,
+    frame: false, resizable: false, alwaysOnTop: true, skipTaskbar: true,
+    transparent: true, backgroundColor: '#00000000', icon: appIcon(),
+    maximizable: false, minimizable: false, fullscreenable: false,
+    webPreferences: { nodeIntegration: true, contextIsolation: false, backgroundThrottling: false }
+  });
+  miniWindow.setAlwaysOnTop(true, 'floating');
+  miniWindow.loadFile(path.join(__dirname, 'mini.html'));
+  miniWindow.webContents.on('did-finish-load', () => {
+    if (presence && presence.last) miniWindow.webContents.send('mini-np', presence.last);
+  });
+  miniWindow.on('closed', () => {
+    miniWindow = null;
+    if (config.miniPlayer) { config.miniPlayer = false; scheduleSave(); }
+  });
+}
+function closeMiniWindow() { if (miniWindow) { miniWindow.destroy(); miniWindow = null; } }
+
 async function loadExtensions() {
   const dir = extensionsDir();
   try {
@@ -410,6 +439,7 @@ function registerIpc() {
     }
     if ('minimizeToTray' in patch && config.minimizeToTray) setupTray();
     if ('globalHotkeys' in patch) registerHotkeys();
+    if ('miniPlayer' in patch) { config.miniPlayer ? createMiniWindow() : closeMiniWindow(); }
     if ('lyrics' in patch && config.lyrics) { lastNpKey = ''; if (presence && presence.last) handleNowPlaying(presence.last); }
     if ('autoAccent' in patch && config.autoAccent) { lastNpKey = ''; if (presence && presence.last) handleNowPlaying(presence.last); }
   });
@@ -418,9 +448,11 @@ function registerIpc() {
     log.w('[ipc] now-playing: title=' + (data && data.title) + ' playing=' + (data && data.playing) + ' artwork=' + (data && data.artwork ? 'yes' : 'no'));
     if (presence) presence.update(data);
     handleNowPlaying(data);
+    if (miniWindow) miniWindow.webContents.send('mini-np', data);
   });
   ipcMain.on('ss-open-external', (_e, url) => { shell.openExternal(url).catch(() => {}); });
   ipcMain.on('ss-control', (_e, action) => pageControl(action));
+  ipcMain.on('mini-close', () => { config.miniPlayer = false; scheduleSave(); closeMiniWindow(); });
   ipcMain.on('ss-log', (_e, msg) => log.w('[ui] ' + msg));
 
   ipcMain.handle('ss-pick-image', async () => {
@@ -464,6 +496,7 @@ if (!gotLock) {
     await loadExtensions();
     if (config.minimizeToTray) setupTray();
     registerHotkeys();
+    if (config.miniPlayer) createMiniWindow();
 
     createSplash();
     createMainWindow();

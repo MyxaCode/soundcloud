@@ -54,6 +54,7 @@
     globalHotkeys: true,
     autoAccent: false,
     lyrics: false,
+    miniPlayer: false,
     cssThemes: []
   };
 
@@ -991,6 +992,7 @@
     slRow.appendChild(slSel); now.appendChild(slRow);
     now.appendChild(el('div', { id: 'ss-sleep-note', class: 'ss-d', style: 'margin-top:6px' }, ''));
     now.appendChild(toggleRow('Lyrics', 'Fetch synced lyrics for the fullscreen view', 'lyrics', function () { renderLyrics(); }));
+    now.appendChild(toggleRow('Mini player', 'A small always-on-top player over other apps', 'miniPlayer'));
     var nowBtn = el('button', { id: 'ss-nowbtn' }, 'Open fullscreen player');
     nowBtn.addEventListener('click', function () { closePanel(); openNow(); });
     now.appendChild(nowBtn);

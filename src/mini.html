@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-user-select: none; user-select: none; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: transparent;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+  .mini { width: 100%; height: 100%; background: #121214; border: 1px solid #242428;
+    border-radius: 14px; display: flex; align-items: center; gap: 11px; padding: 11px 12px;
+    -webkit-app-region: drag; box-shadow: 0 14px 34px rgba(0,0,0,.55); position: relative; }
+  .art { width: 62px; height: 62px; border-radius: 10px; flex: 0 0 auto;
+    background: #1f1f23 center/cover no-repeat; box-shadow: 0 3px 10px rgba(0,0,0,.4); }
+  .info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+  .t { font-size: 13px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .a { font-size: 11.5px; color: #a0a0a6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+  .ctl { display: flex; align-items: center; gap: 3px; -webkit-app-region: no-drag; }
+  .b { width: 32px; height: 32px; border: none; background: none; color: #d6d6db; border-radius: 8px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; transition: .12s; }
+  .b:hover { background: #232327; color: #fff; }
+  .b.play { background: #fff; color: #111; width: 36px; height: 36px; }
+  .b.play:hover { filter: brightness(.92); background: #fff; }
+  .b svg { width: 18px; height: 18px; }
+  .b.play svg { width: 20px; height: 20px; }
+  .b.like.on { color: #ff4d6a; }
+  .x { position: absolute; top: 4px; right: 6px; width: 18px; height: 18px; border: none; background: none;
+    color: #6c6c72; font-size: 11px; cursor: pointer; -webkit-app-region: no-drag; border-radius: 5px; line-height: 1; }
+  .x:hover { color: #fff; background: #26262b; }
+</style>
+</head>
+<body>
+  <div class="mini">
+    <div class="art" id="art"></div>
+    <div class="info"><div class="t" id="t">Nothing playing</div><div class="a" id="a"></div></div>
+    <div class="ctl">
+      <button class="b" id="prev" title="Previous"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 6h2v12H7zM20 6v12l-9-6z"/></svg></button>
+      <button class="b play" id="play" title="Play / Pause"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+      <button class="b" id="next" title="Next"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15 6h2v12h-2zM4 6l9 6-9 6z"/></svg></button>
+      <button class="b like" id="like" title="Like"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21l-1.4-1.3C5.4 15 2 11.9 2 8.2 2 5.6 4.1 3.5 6.7 3.5c1.5 0 2.9.7 3.8 1.9.9-1.2 2.3-1.9 3.8-1.9 2.6 0 4.7 2.1 4.7 4.7 0 3.7-3.4 6.8-8.6 11.5L12 21z"/></svg></button>
+    </div>
+    <button class="x" id="close" title="Close">✕</button>
+  </div>
+  <script>
+    const { ipcRenderer } = require('electron');
+    const ICON_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+    const ICON_PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>';
+    const $ = (id) => document.getElementById(id);
+    $('prev').onclick = () => ipcRenderer.send('ss-control', 'prev');
+    $('next').onclick = () => ipcRenderer.send('ss-control', 'next');
+    $('play').onclick = () => ipcRenderer.send('ss-control', 'playpause');
+    $('like').onclick = () => ipcRenderer.send('ss-control', 'like');
+    $('close').onclick = () => ipcRenderer.send('mini-close');
+    ipcRenderer.on('mini-np', (e, d) => {
+      if (!d || !d.title) { $('t').textContent = 'Nothing playing'; $('a').textContent = ''; $('art').style.backgroundImage = ''; return; }
+      $('t').textContent = d.title;
+      $('a').textContent = d.artist ? ('by ' + d.artist) : 'SoundCloud';
+      $('art').style.backgroundImage = d.artwork ? ('url("' + d.artwork + '")') : '';
+      $('play').innerHTML = d.playing ? ICON_PAUSE : ICON_PLAY;
+    });
+  </script>
+</body>
+</html>
