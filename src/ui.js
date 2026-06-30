@@ -50,6 +50,10 @@
     fx8d: false,
     fxReverb: 0,
     speed: 100,
+    notify: false,
+    globalHotkeys: true,
+    autoAccent: false,
+    lyrics: false,
     cssThemes: []
   };
 
@@ -625,6 +629,33 @@
     applyPageStyles();
   }
 
+  function ssClick(sel) { var e = document.querySelector(sel); if (e) { e.click(); return true; } return false; }
+  window.__ssControl = function (action) {
+    try {
+      if (action === 'next') ssClick('.skipControl__next');
+      else if (action === 'prev') ssClick('.skipControl__previous');
+      else if (action === 'like') { if (!ssClick('.playbackSoundBadge .sc-button-like')) ssClick('.playControls__soundBadge .sc-button-like'); }
+      else ssClick('.playControls__play');
+    } catch (e) {}
+  };
+  window.__ssSetAccent = function (hex) {
+    if (!hex) return;
+    config.accent = hex;
+    try { applyAccent(); } catch (e) {}
+    try { var pk = document.querySelector('#ss-themes input[type=color]'); if (pk) pk.value = hex; } catch (e) {}
+  };
+  var sleepTimer = null;
+  function setSleep(min) {
+    if (sleepTimer) { clearTimeout(sleepTimer); sleepTimer = null; }
+    var note = document.getElementById('ss-sleep-note');
+    if (!min) { if (note) note.textContent = ''; return; }
+    sleepTimer = setTimeout(function () {
+      try { var list = document.querySelectorAll('audio,video'); for (var i = 0; i < list.length; i++) { try { list[i].pause(); } catch (e) {} } } catch (e) {}
+      sleepTimer = null; var n2 = document.getElementById('ss-sleep-note'); if (n2) n2.textContent = 'Paused by the sleep timer.';
+    }, min * 60000);
+    if (note) note.textContent = 'Will pause in ' + min + ' min.';
+  }
+
   var SVGA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">';
   var ICONS = {
     discord: SVGA + '<path d="M20 4H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h3v3l4-3h9a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1z"/></svg>',
@@ -823,11 +854,23 @@
     pgViz.appendChild(viz);
 
     var now = section('Now Playing');
-    now.appendChild(el('div', { class: 'ss-d', style: 'line-height:1.5' }, 'Lyrics, a fullscreen mode and a mini player land here in the next update.'));
+    now.appendChild(toggleRow('Auto color from cover', 'Accent follows the current track artwork', 'autoAccent', function (on) {
+      if (on) { config.manualAccent = config.accent; save({ manualAccent: config.accent }); }
+      else { if (config.manualAccent) { config.accent = config.manualAccent; save({ accent: config.accent }); applyAccent(); } }
+    }));
+    now.appendChild(toggleRow('Track notifications', 'Desktop popup when the song changes', 'notify'));
+    var slRow = el('div', { class: 'ss-row' });
+    slRow.appendChild(el('div', { class: 'ss-l' }, 'Sleep timer'));
+    var slSel = el('select');
+    [['0', 'Off'], ['15', '15 min'], ['30', '30 min'], ['45', '45 min'], ['60', '60 min'], ['90', '90 min']].forEach(function (o) { slSel.appendChild(el('option', { value: o[0] }, o[1])); });
+    slSel.addEventListener('change', function () { setSleep(parseInt(slSel.value, 10)); });
+    slRow.appendChild(slSel); now.appendChild(slRow);
+    now.appendChild(el('div', { id: 'ss-sleep-note', class: 'ss-d', style: 'margin-top:6px' }, ''));
     pgNow.appendChild(now);
 
     var adv = section('General');
     adv.appendChild(toggleRow('Minimize to tray', 'Closing the window hides it to the tray', 'minimizeToTray'));
+    adv.appendChild(toggleRow('Media hotkeys', 'Media keys control playback even when unfocused', 'globalHotkeys'));
     adv.appendChild(toggleRow('Ad blocker', 'Applies after restart', 'adBlock'));
 
     var cssBox = el('textarea', { id: 'ss-css', spellcheck: 'false', placeholder: '/* custom CSS for SoundCloud */' });

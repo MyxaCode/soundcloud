@@ -1,6 +1,7 @@
-const { app, BrowserWindow, session, shell, ipcMain, nativeImage, Tray, Menu, dialog } = require('electron');
+const { app, BrowserWindow, session, shell, ipcMain, nativeImage, Tray, Menu, dialog, globalShortcut, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const https = require('https');
 const DiscordPresence = require('./discordPresence');
 const log = require('./log');
 
@@ -48,6 +49,10 @@ const DEFAULT_CONFIG = {
   fx8d: false,
   fxReverb: 0,
   speed: 100,
+  notify: false,
+  globalHotkeys: true,
+  autoAccent: false,
+  lyrics: false,
   cssThemes: []
 };
 
@@ -141,6 +146,113 @@ function extensionsDir() {
 function appIcon() {
   const p = path.join(__dirname, '..', 'assets', 'icon.ico');
   return fs.existsSync(p) ? nativeImage.createFromPath(p) : undefined;
+}
+function appIconPng() {
+  const p = path.join(__dirname, '..', 'assets', 'icon.png');
+  return fs.existsSync(p) ? nativeImage.createFromPath(p) : undefined;
+}
+
+function httpGet(url, asText, cb, depth) {
+  if ((depth || 0) > 4) { cb(new Error('too many redirects')); return; }
+  try {
+    https.get(url, { headers: { 'User-Agent': UA, 'Accept': '*/*' } }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        res.resume(); httpGet(res.headers.location, asText, cb, (depth || 0) + 1); return;
+      }
+      if (res.statusCode !== 200) { res.resume(); cb(new Error('status ' + res.statusCode)); return; }
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => { const b = Buffer.concat(chunks); cb(null, asText ? b.toString('utf8') : b); });
+    }).on('error', (e) => cb(e));
+  } catch (e) { cb(e); }
+}
+
+function pageControl(action) {
+  if (!mainWindow) return;
+  const js = "window.__ssControl && window.__ssControl(" + JSON.stringify(String(action)) + ")";
+  mainWindow.webContents.executeJavaScript(js).catch(() => {});
+}
+
+const MEDIA_KEYS = {
+  'MediaPlayPause': 'playpause',
+  'MediaNextTrack': 'next',
+  'MediaPreviousTrack': 'prev'
+};
+function registerHotkeys() {
+  try { globalShortcut.unregisterAll(); } catch (e) {}
+  if (!config.globalHotkeys) return;
+  Object.keys(MEDIA_KEYS).forEach((k) => {
+    try { globalShortcut.register(k, () => pageControl(MEDIA_KEYS[k])); } catch (e) {}
+  });
+}
+
+function computeAccent(buf) {
+  try {
+    let img = nativeImage.createFromBuffer(buf);
+    if (img.isEmpty()) return null;
+    img = img.resize({ width: 36, height: 36, quality: 'good' });
+    const bm = img.toBitmap();
+    const size = img.getSize();
+    let br = 0, bg = 0, bb = 0, bw = 0, fr = 0, fg = 0, fb = 0, fc = 0;
+    for (let i = 0; i + 3 < bm.length; i += 4) {
+      const b = bm[i], g = bm[i + 1], r = bm[i + 2];
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+      const l = (mx + mn) / 510;
+      const sat = mx === 0 ? 0 : (mx - mn) / mx;
+      const w = sat * sat * (1 - Math.abs(l - 0.5) * 1.2);
+      fr += r * w; fg += g * w; fb += b * w; fc += w;
+      br += r; bg += g; bb += b; bw++;
+    }
+    let r, g, b;
+    if (fc > 0.5) { r = fr / fc; g = fg / fc; b = fb / fc; }
+    else if (bw > 0) { r = br / bw; g = bg / bw; b = bb / bw; }
+    else return null;
+    const toHex = (n) => ('0' + Math.max(0, Math.min(255, Math.round(n))).toString(16)).slice(-2);
+    return '#' + toHex(r) + toHex(g) + toHex(b);
+  } catch (e) { return null; }
+}
+
+let lastNpKey = '';
+function pageCall(fnName, arg) {
+  if (!mainWindow) return;
+  const js = 'window.' + fnName + ' && window.' + fnName + '(' + JSON.stringify(arg) + ')';
+  mainWindow.webContents.executeJavaScript(js).catch(() => {});
+}
+function showTrackNotification(d) {
+  const make = (icon) => {
+    try {
+      const n = new Notification({ title: d.title, body: d.artist ? 'by ' + d.artist : 'SoundCloud', icon: icon || appIconPng(), silent: true });
+      n.on('click', () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } });
+      n.show();
+    } catch (e) {}
+  };
+  if (d.artwork) httpGet(d.artwork, false, (err, buf) => make(!err && buf ? nativeImage.createFromBuffer(buf) : null));
+  else make(null);
+}
+function fetchLyrics(d) {
+  const q = 'https://lrclib.net/api/get?artist_name=' + encodeURIComponent(d.artist || '') + '&track_name=' + encodeURIComponent(d.title || '');
+  httpGet(q, true, (err, txt) => {
+    const payload = { synced: null, plain: null, title: d.title || '' };
+    if (!err && txt) {
+      try { const j = JSON.parse(txt); payload.synced = j.syncedLyrics || null; payload.plain = j.plainLyrics || null; } catch (e) {}
+    }
+    pageCall('__ssLyrics', payload);
+  });
+}
+function handleNowPlaying(d) {
+  if (!d || !d.title) return;
+  const key = d.title + '|' + (d.artist || '');
+  if (key === lastNpKey) return;
+  lastNpKey = key;
+  if (config.notify) showTrackNotification(d);
+  if (config.autoAccent && d.artwork) {
+    httpGet(d.artwork, false, (err, buf) => {
+      if (err || !buf) return;
+      const hex = computeAccent(buf);
+      if (hex) pageCall('__ssSetAccent', hex);
+    });
+  }
+  if (config.lyrics) fetchLyrics(d);
 }
 
 function setupSession() {
@@ -297,13 +409,18 @@ function registerIpc() {
       }
     }
     if ('minimizeToTray' in patch && config.minimizeToTray) setupTray();
+    if ('globalHotkeys' in patch) registerHotkeys();
+    if ('lyrics' in patch && config.lyrics) { lastNpKey = ''; if (presence && presence.last) handleNowPlaying(presence.last); }
+    if ('autoAccent' in patch && config.autoAccent) { lastNpKey = ''; if (presence && presence.last) handleNowPlaying(presence.last); }
   });
 
   ipcMain.on('now-playing', (_e, data) => {
     log.w('[ipc] now-playing: title=' + (data && data.title) + ' playing=' + (data && data.playing) + ' artwork=' + (data && data.artwork ? 'yes' : 'no'));
     if (presence) presence.update(data);
+    handleNowPlaying(data);
   });
   ipcMain.on('ss-open-external', (_e, url) => { shell.openExternal(url).catch(() => {}); });
+  ipcMain.on('ss-control', (_e, action) => pageControl(action));
   ipcMain.on('ss-log', (_e, msg) => log.w('[ui] ' + msg));
 
   ipcMain.handle('ss-pick-image', async () => {
@@ -346,6 +463,7 @@ if (!gotLock) {
     registerIpc();
     await loadExtensions();
     if (config.minimizeToTray) setupTray();
+    registerHotkeys();
 
     createSplash();
     createMainWindow();
@@ -357,6 +475,7 @@ if (!gotLock) {
 }
 
 app.on('before-quit', () => { app.isQuitting = true; flushSave(); });
+app.on('will-quit', () => { try { globalShortcut.unregisterAll(); } catch (e) {} });
 
 app.on('window-all-closed', () => {
   flushSave();
