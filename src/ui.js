@@ -330,7 +330,32 @@
     '.ss-decor-rm{flex:0 0 auto;color:#75757a;cursor:pointer;font-size:13px;padding:4px 7px;border-radius:7px;transition:.15s}',
     '.ss-decor-rm:hover{background:#2a1620;color:#ff6b6b}',
     '#ss-hint{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:2147483646;background:#161618;color:#dcdcdc;border:1px solid #28282c;border-radius:10px;padding:8px 15px;font:12px sans-serif;opacity:0;transition:opacity .3s;pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.45)}',
-    '#ss-hint.show{opacity:1}'
+    '#ss-hint.show{opacity:1}',
+    '#ss-nowbtn{width:100%;margin-top:4px;background:var(--ss-accent);color:#fff;border:none;border-radius:9px;padding:10px;font-size:12.5px;font-weight:700;cursor:pointer;transition:.15s}',
+    '#ss-nowbtn:hover{filter:brightness(1.08)}',
+    '#ss-now{position:fixed;inset:0;z-index:2147483644;display:none;align-items:center;justify-content:center;overflow:hidden;font:15px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:#fff}',
+    '#ss-now.open{display:flex}',
+    '#ss-now .nbg{position:absolute;inset:-80px;background-size:cover;background-position:center;filter:blur(64px) brightness(.45) saturate(1.2);transform:scale(1.12);z-index:0}',
+    '#ss-now .nsh{position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,8,11,.55),rgba(8,8,11,.9));z-index:1}',
+    '#ss-now .nwrap{position:relative;z-index:2;display:flex;gap:50px;align-items:center;width:90%;max-width:1080px}',
+    '#ss-now .nart{width:340px;height:340px;flex:0 0 auto;border-radius:18px;background:#1c1c20 center/cover no-repeat;box-shadow:0 30px 90px rgba(0,0,0,.6)}',
+    '#ss-now .nside{flex:1;min-width:0;display:flex;flex-direction:column}',
+    '#ss-now .nt{font-size:34px;font-weight:800;letter-spacing:-.4px;line-height:1.12;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}',
+    '#ss-now .na{font-size:18px;color:#c8c8cf;margin-top:8px}',
+    '#ss-now-viz{width:100%;height:64px;display:block;margin:18px 0 6px}',
+    '#ss-now .nctl{display:flex;align-items:center;gap:18px;margin-top:6px}',
+    '#ss-now .nbtn{width:46px;height:46px;border-radius:50%;border:none;background:rgba(255,255,255,.1);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s}',
+    '#ss-now .nbtn:hover{background:rgba(255,255,255,.2)}',
+    '#ss-now .nbtn.big{width:60px;height:60px;background:#fff;color:#111}',
+    '#ss-now .nbtn svg{width:22px;height:22px}',
+    '#ss-now .nbtn.big svg{width:26px;height:26px}',
+    '#ss-now .nlyr{margin-top:22px;height:230px;overflow:hidden;-webkit-mask-image:linear-gradient(180deg,transparent,#000 22%,#000 78%,transparent);position:relative}',
+    '#ss-now .nlyr .lns{transition:transform .35s cubic-bezier(.16,1,.3,1)}',
+    '#ss-now .nlyr .ln{font-size:19px;color:#86868e;padding:7px 0;transition:color .2s,font-size .2s;font-weight:600}',
+    '#ss-now .nlyr .ln.on{color:#fff;font-size:22px;font-weight:800}',
+    '#ss-now .nlyr.empty{display:flex;align-items:center;color:#86868e;font-size:15px}',
+    '#ss-now .nx{position:absolute;top:24px;right:28px;z-index:3;width:40px;height:40px;border-radius:11px;border:none;background:rgba(255,255,255,.08);color:#fff;font-size:17px;cursor:pointer;transition:.15s}',
+    '#ss-now .nx:hover{background:rgba(255,255,255,.2)}'
   ].join('');
 
   function injectCss() {
@@ -656,6 +681,105 @@
     if (note) note.textContent = 'Will pause in ' + min + ' min.';
   }
 
+  var lyr = { lines: null, plain: null, idx: -1 };
+  var nowUI = null, nowOpen = false, nowVizCanvas = null;
+  var curTrack = null, curNow = 0, curMax = 0;
+  function parseLRC(text) {
+    var out = [], lines = String(text).split('\n');
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i], re = /\[(\d+):(\d+)(?:[.:](\d+))?\]/g, m, times = [];
+      while ((m = re.exec(line))) times.push(parseInt(m[1], 10) * 60 + parseInt(m[2], 10) + (m[3] ? parseFloat('0.' + m[3]) : 0));
+      var txt = line.replace(/\[[^\]]*\]/g, '').trim();
+      for (var j = 0; j < times.length; j++) out.push({ t: times[j], text: txt });
+    }
+    out.sort(function (a, b) { return a.t - b.t; });
+    return out.length ? out : null;
+  }
+  window.__ssLyrics = function (payload) {
+    if (!payload) return;
+    lyr.lines = payload.synced ? parseLRC(payload.synced) : null;
+    lyr.plain = payload.plain || null;
+    lyr.idx = -1;
+    renderLyrics();
+  };
+  function setLyrEmpty(msg) {
+    if (!nowUI) return;
+    nowUI.lyrBox.classList.add('empty'); nowUI.lns.innerHTML = '';
+    nowUI.lns.appendChild(el('div', null, msg));
+  }
+  function renderLyrics() {
+    if (!nowUI) return;
+    lyr.idx = -1; nowUI.lns.style.transform = '';
+    if (!config.lyrics) { setLyrEmpty('Lyrics are off'); return; }
+    if (lyr.lines && lyr.lines.length) {
+      nowUI.lyrBox.classList.remove('empty'); nowUI.lns.innerHTML = '';
+      lyr.lines.forEach(function (l) { nowUI.lns.appendChild(el('div', { class: 'ln' }, l.text || '♪')); });
+    } else if (lyr.plain) {
+      nowUI.lyrBox.classList.remove('empty'); nowUI.lns.innerHTML = '';
+      lyr.plain.split('\n').forEach(function (l) { nowUI.lns.appendChild(el('div', { class: 'ln' }, l || ' ')); });
+    } else setLyrEmpty('No lyrics found for this track');
+  }
+  function highlightLyrics(sec) {
+    if (!nowUI || !nowOpen || !lyr.lines || nowUI.lyrBox.classList.contains('empty')) return;
+    var i = -1, L = lyr.lines;
+    for (var k = 0; k < L.length; k++) { if (L[k].t <= sec + 0.2) i = k; else break; }
+    if (i === lyr.idx) return;
+    lyr.idx = i;
+    var nodes = nowUI.lns.children;
+    for (var n = 0; n < nodes.length; n++) nodes[n].classList.toggle('on', n === i);
+    if (i >= 0 && nodes[i]) {
+      var box = nowUI.lyrBox.clientHeight, off = nodes[i].offsetTop + nodes[i].offsetHeight / 2;
+      nowUI.lns.style.transform = 'translateY(' + (box / 2 - off) + 'px)';
+    }
+  }
+  function nowIcon(d) { return '<svg viewBox="0 0 24 24" fill="currentColor">' + d + '</svg>'; }
+  function buildNowScreen() {
+    if (nowUI) return;
+    var root = el('div', { id: 'ss-now' });
+    var bg = el('div', { class: 'nbg' }), sh = el('div', { class: 'nsh' });
+    var xb = el('button', { class: 'nx' }, '✕'); xb.addEventListener('click', closeNow);
+    var wrap = el('div', { class: 'nwrap' });
+    var art = el('div', { class: 'nart' });
+    var side = el('div', { class: 'nside' });
+    var t = el('div', { class: 'nt' }, 'Nothing playing'), a = el('div', { class: 'na' }, '');
+    nowVizCanvas = el('canvas', { id: 'ss-now-viz' });
+    var ctl = el('div', { class: 'nctl' });
+    var bprev = el('button', { class: 'nbtn', title: 'Previous' }, nowIcon('<path d="M7 6h2v12H7zM20 6v12l-9-6z"/>'));
+    var bplay = el('button', { class: 'nbtn big', title: 'Play / Pause' }, nowIcon('<path d="M8 5v14l11-7z"/>'));
+    var bnext = el('button', { class: 'nbtn', title: 'Next' }, nowIcon('<path d="M15 6h2v12h-2zM4 6l9 6-9 6z"/>'));
+    bprev.addEventListener('click', function () { window.__ssControl('prev'); });
+    bplay.addEventListener('click', function () { window.__ssControl('playpause'); });
+    bnext.addEventListener('click', function () { window.__ssControl('next'); });
+    ctl.appendChild(bprev); ctl.appendChild(bplay); ctl.appendChild(bnext);
+    var lyrBox = el('div', { class: 'nlyr empty' }), lns = el('div', { class: 'lns' });
+    lyrBox.appendChild(lns);
+    side.appendChild(t); side.appendChild(a); side.appendChild(nowVizCanvas); side.appendChild(ctl); side.appendChild(lyrBox);
+    wrap.appendChild(art); wrap.appendChild(side);
+    root.appendChild(bg); root.appendChild(sh); root.appendChild(xb); root.appendChild(wrap);
+    document.body.appendChild(root);
+    nowUI = { root: root, bg: bg, art: art, t: t, a: a, lyrBox: lyrBox, lns: lns, cur: null };
+    renderLyrics();
+  }
+  function updateNow() {
+    if (!nowUI || !nowOpen) return;
+    var d = curTrack;
+    if (d && d.title) {
+      nowUI.t.textContent = d.title;
+      nowUI.a.textContent = d.artist ? 'by ' + d.artist : 'SoundCloud';
+      var art = d.artwork || '';
+      if (nowUI.cur !== art) { nowUI.cur = art; nowUI.art.style.backgroundImage = art ? 'url("' + art + '")' : ''; nowUI.bg.style.backgroundImage = art ? 'url("' + art + '")' : ''; }
+    } else { nowUI.t.textContent = 'Nothing playing'; nowUI.a.textContent = ''; }
+    highlightLyrics(curNow);
+  }
+  function openNow() {
+    buildNowScreen();
+    nowOpen = true; nowUI.root.classList.add('open');
+    if (nowVizCanvas) { nowVizCanvas.width = nowVizCanvas.clientWidth || 500; nowVizCanvas.height = 64; }
+    updateNow();
+  }
+  function closeNow() { if (nowUI) nowUI.root.classList.remove('open'); nowOpen = false; }
+  function toggleNow() { nowOpen ? closeNow() : openNow(); }
+
   var SVGA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">';
   var ICONS = {
     discord: SVGA + '<path d="M20 4H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h3v3l4-3h9a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1z"/></svg>',
@@ -866,6 +990,11 @@
     slSel.addEventListener('change', function () { setSleep(parseInt(slSel.value, 10)); });
     slRow.appendChild(slSel); now.appendChild(slRow);
     now.appendChild(el('div', { id: 'ss-sleep-note', class: 'ss-d', style: 'margin-top:6px' }, ''));
+    now.appendChild(toggleRow('Lyrics', 'Fetch synced lyrics for the fullscreen view', 'lyrics', function () { renderLyrics(); }));
+    var nowBtn = el('button', { id: 'ss-nowbtn' }, 'Open fullscreen player');
+    nowBtn.addEventListener('click', function () { closePanel(); openNow(); });
+    now.appendChild(nowBtn);
+    now.appendChild(el('div', { class: 'ss-d', style: 'margin-top:8px;line-height:1.45' }, 'Press F2 anytime to open or close the fullscreen player.'));
     pgNow.appendChild(now);
 
     var adv = section('General');
@@ -1129,12 +1258,14 @@
     requestAnimationFrame(vizLoop);
     var needMenu = panelOpen && config.viz && vizCanvas;
     var needPage = config.vizOnPage && pageVizCanvas && pageVizCanvas.style.display !== 'none';
-    if (!needMenu && !needPage) return;
+    var needNow = nowOpen && nowVizCanvas;
+    if (!needMenu && !needPage && !needNow) return;
     if ((vizFrame++ % 6) === 0) vizA = activeAnalyser();
     var style = config.vizStyle || 'bars';
     var opt = { rainbow: config.vizRainbow !== false, mirror: !!config.vizMirror, caps: config.vizCaps !== false, glow: true, style: style };
     if (needMenu) { if (!vizCanvas.width) resizeViz(); drawSpectrum(vizCanvas, 56, opt); }
     if (needPage) { var bars = Math.min(150, Math.max(40, Math.round(pageVizCanvas.width / 5))); drawSpectrum(pageVizCanvas, bars, { rainbow: opt.rainbow, mirror: opt.mirror, caps: opt.caps, glow: bars <= 110, style: style }); }
+    if (needNow) { if (!nowVizCanvas.width) { nowVizCanvas.width = nowVizCanvas.clientWidth || 500; nowVizCanvas.height = 64; } drawSpectrum(nowVizCanvas, 72, opt); }
   }
   function positionPageViz() {
     if (!pageVizCanvas) return;
@@ -1192,7 +1323,8 @@
   function togglePanel() { panelOpen ? closePanel() : openPanel(); }
   document.addEventListener('keydown', function (e) {
     if (e.key === 'F1') { e.preventDefault(); e.stopPropagation(); togglePanel(); }
-    else if (e.key === 'Escape' && panelOpen) closePanel();
+    else if (e.key === 'F2') { e.preventDefault(); e.stopPropagation(); toggleNow(); }
+    else if (e.key === 'Escape') { if (nowOpen) { e.preventDefault(); closeNow(); } else if (panelOpen) closePanel(); }
   }, true);
 
   function abs(u) { return !u ? null : (u.indexOf('http') === 0 ? u : 'https://soundcloud.com' + u); }
@@ -1216,6 +1348,10 @@
     } catch (e) {}
   }
   function updatePreview(data, now, max) {
+    curTrack = (data && data.title) ? data : null;
+    curNow = (typeof now === 'number') ? now : 0;
+    curMax = (typeof max === 'number') ? max : 0;
+    if (nowOpen) updateNow();
     if (!preview) return;
     if (!data || !data.title) {
       preview.t.textContent = 'Nothing playing'; preview.a.textContent = '';
