@@ -15,6 +15,13 @@ function pad(s) {
   s = String(s || '');
   return s.length < 2 ? s + ' ' : s;
 }
+function clock(sec) {
+  sec = Math.max(0, Math.round(Number(sec) || 0));
+  if (!sec) return '';
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return m + ':' + (s < 10 ? '0' : '') + s;
+}
 
 class DiscordPresence {
   constructor(config) {
@@ -77,20 +84,28 @@ class DiscordPresence {
     if (!playing && !c.displayWhenPaused) { this.clear(); return; }
 
     const artist = track.artist || '';
+    const who = artist || 'SoundCloud';
+    const dur = Number(track.duration) || (
+      track.endTimestamp && track.startTimestamp
+        ? Math.round((track.endTimestamp - track.startTimestamp) / 1000)
+        : 0
+    );
+    const len = clock(dur);
     const activity = {
       type: 2,
       name: 'SoundCloud',
       details: pad(trim(track.title, 128)),
       state: playing
-        ? pad(trim(artist ? 'by ' + artist : 'SoundCloud', 128))
-        : pad(trim('Paused' + (artist ? ' · ' + artist : ''), 128)),
+        ? pad(trim(who + (len ? ' · ' + len : ''), 128))
+        : pad(trim('Paused · ' + who + (len ? ' · ' + len : ''), 128)),
       largeImageKey: track.artwork || 'soundcloud-logo',
+      largeImageText: trim(who + ' — ' + (track.title || 'SoundCloud'), 128),
       instance: false
     };
 
     if (c.displaySmallIcon) {
       activity.smallImageKey = 'soundcloud-logo';
-      activity.smallImageText = 'SoundCloud';
+      activity.smallImageText = playing ? 'Playing' : 'Paused';
     }
     if (playing && track.startTimestamp && track.endTimestamp) {
       activity.startTimestamp = track.startTimestamp;

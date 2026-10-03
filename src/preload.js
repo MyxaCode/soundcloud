@@ -7,7 +7,8 @@ contextBridge.exposeInMainWorld('SSBridge', {
   setConfig: (patch) => ipcRenderer.send('ss-set-config', patch),
   openExternal: (url) => ipcRenderer.send('ss-open-external', url),
   log: (msg) => ipcRenderer.send('ss-log', msg),
-  pickImage: () => ipcRenderer.invoke('ss-pick-image')
+  pickImage: () => ipcRenderer.invoke('ss-pick-image'),
+  lyricLine: (payload) => ipcRenderer.send('ss-lyric-line', payload)
 });
 
 let UI = '';

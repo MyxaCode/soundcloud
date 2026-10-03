@@ -74,7 +74,10 @@ const DEFAULT_CONFIG = {
   winY: null,
   winMax: false,
   miniX: null,
-  miniY: null
+  miniY: null,
+  lyricOverlay: false,
+  lyricX: null,
+  lyricY: null
 };
 
 function configPath() {
@@ -549,6 +552,59 @@ function closeMiniWindow() {
   if (miniWindow) { miniWindow.destroy(); miniWindow = null; }
 }
 
+let lyricWindow = null;
+let lyricDrag = null;
+let lastLyric = { text: '', next: '' };
+function stopLyricDrag() {
+  if (!lyricDrag) return;
+  clearInterval(lyricDrag.timer);
+  lyricDrag = null;
+  if (lyricWindow && !lyricWindow.isDestroyed()) {
+    const b = lyricWindow.getBounds();
+    config.lyricX = b.x;
+    config.lyricY = b.y;
+    scheduleSave();
+  }
+}
+function createLyricWindow() {
+  if (lyricWindow && !lyricWindow.isDestroyed()) { lyricWindow.show(); return; }
+  let x, y;
+  try {
+    const wa = screen.getPrimaryDisplay().workArea;
+    x = wa.x + Math.round((wa.width - 520) / 2);
+    y = wa.y + 36;
+  } catch (e) {}
+  if (Number.isFinite(config.lyricX) && Number.isFinite(config.lyricY)) {
+    x = config.lyricX;
+    y = config.lyricY;
+  }
+  lyricWindow = new BrowserWindow({
+    width: 520, height: 78, x: x, y: y,
+    frame: false, resizable: false, alwaysOnTop: true, skipTaskbar: true,
+    transparent: true, backgroundColor: '#00000000',
+    maximizable: false, minimizable: false, fullscreenable: false,
+    webPreferences: { nodeIntegration: true, contextIsolation: false, backgroundThrottling: false }
+  });
+  lyricWindow.setAlwaysOnTop(true, 'floating');
+  lyricWindow.loadFile(path.join(__dirname, 'lyric.html'));
+  lyricWindow.webContents.on('did-finish-load', () => {
+    if (lyricWindow && !lyricWindow.isDestroyed()) lyricWindow.webContents.send('lyric-line', lastLyric);
+  });
+  lyricWindow.on('closed', () => {
+    if (lyricDrag) { clearInterval(lyricDrag.timer); lyricDrag = null; }
+    lyricWindow = null;
+    if (config.lyricOverlay) {
+      config.lyricOverlay = false;
+      scheduleSave();
+      pageCall('__ssLyricOverlay', false);
+    }
+  });
+}
+function closeLyricWindow() {
+  stopLyricDrag();
+  if (lyricWindow && !lyricWindow.isDestroyed()) { lyricWindow.destroy(); lyricWindow = null; }
+}
+
 async function loadExtensions() {
   const dir = extensionsDir();
   try {
@@ -587,6 +643,7 @@ function registerIpc() {
     if ('minimizeToTray' in patch && config.minimizeToTray) setupTray();
     if ('globalHotkeys' in patch) registerHotkeys();
     if ('miniPlayer' in patch) { config.miniPlayer ? createMiniWindow() : closeMiniWindow(); }
+    if ('lyricOverlay' in patch) { config.lyricOverlay ? createLyricWindow() : closeLyricWindow(); }
     if ('zoom' in patch) applyZoom();
     if ('alwaysOnTop' in patch && mainWindow && !mainWindow.isDestroyed()) mainWindow.setAlwaysOnTop(!!config.alwaysOnTop);
     if ('lyrics' in patch && config.lyrics) { lastNpKey = ''; if (presence && presence.last) handleNowPlaying(presence.last); }
@@ -627,6 +684,32 @@ function registerIpc() {
     };
   });
   ipcMain.on('mini-drag-end', () => stopMiniDrag());
+  ipcMain.on('ss-lyric-line', (_e, data) => {
+    lastLyric = { text: (data && data.text) || '', next: (data && data.next) || '' };
+    if (lyricWindow && !lyricWindow.isDestroyed()) lyricWindow.webContents.send('lyric-line', lastLyric);
+  });
+  ipcMain.on('lyric-close', () => {
+    config.lyricOverlay = false;
+    scheduleSave();
+    pageCall('__ssLyricOverlay', false);
+    closeLyricWindow();
+  });
+  ipcMain.on('lyric-drag-start', () => {
+    if (!lyricWindow || lyricWindow.isDestroyed()) return;
+    stopLyricDrag();
+    const cursor = screen.getCursorScreenPoint();
+    const b = lyricWindow.getBounds();
+    const ox = cursor.x - b.x;
+    const oy = cursor.y - b.y;
+    lyricDrag = {
+      timer: setInterval(() => {
+        if (!lyricWindow || lyricWindow.isDestroyed()) { stopLyricDrag(); return; }
+        const c = screen.getCursorScreenPoint();
+        lyricWindow.setPosition(Math.round(c.x - ox), Math.round(c.y - oy));
+      }, 16)
+    };
+  });
+  ipcMain.on('lyric-drag-end', () => stopLyricDrag());
   ipcMain.on('ss-log', (_e, msg) => log.w('[ui] ' + msg));
 
   ipcMain.handle('ss-pick-image', async () => {
@@ -671,6 +754,7 @@ if (!gotLock) {
     if (config.minimizeToTray) setupTray();
     registerHotkeys();
     if (config.miniPlayer) createMiniWindow();
+    if (config.lyricOverlay) createLyricWindow();
 
     createSplash();
     createMainWindow();
