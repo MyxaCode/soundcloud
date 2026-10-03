@@ -67,7 +67,9 @@
     mono: false,
     leveler: false,
     history: [],
-    lyricOverlay: false
+    lyricOverlay: false,
+    stageOpen: false,
+    vizClear: false
   };
 
   var config = Object.assign({}, DEFAULTS, Bridge.getConfig() || {});
@@ -284,15 +286,16 @@
     '::-webkit-scrollbar-track{background:transparent}',
     '::-webkit-scrollbar-thumb{background:#28282b;border-radius:6px}',
     '::-webkit-scrollbar-thumb:hover{background:#37373b}',
-    '#ss-panel{--ss-accent:#ff5500;position:fixed;top:0;right:0;height:100%;width:448px;z-index:2147483646;box-sizing:border-box;',
-    'background:#1b1b1b;border-left:1px solid #2a2a2a;color:#e8e8e8;font:13px/1.4 Segoe UI,sans-serif;box-shadow:-6px 0 18px rgba(0,0,0,.35);',
-    'overflow:hidden;display:flex;flex-direction:column;transform:translateX(101%);transition:transform .2s ease}',
+    '#ss-panel{--ss-accent:#ff5500;position:fixed;top:0;right:0;height:100%;width:560px;z-index:2147483646;box-sizing:border-box;',
+    'background:#101010;border-left:1px solid #242424;color:#ececec;font:13px/1.45 Segoe UI,sans-serif;box-shadow:-16px 0 40px rgba(0,0,0,.45);',
+    'overflow:hidden;display:flex;flex-direction:column;transform:translateX(102%);transition:transform .22s ease}',
     '#ss-panel.open{transform:none}',
-    '#ss-panel .ss-tabs{display:flex;flex-wrap:wrap;gap:0 2px;padding:0 8px;border-bottom:1px solid #2a2a2a;background:#161616;flex:0 0 auto}',
-    '#ss-panel .ss-tab{background:none;border:none;border-bottom:2px solid transparent;color:#8d8d8d;cursor:pointer;padding:9px 9px 7px;font:13px/1.2 Segoe UI,sans-serif}',
-    '#ss-panel .ss-tab:hover{color:#ddd}',
-    '#ss-panel .ss-tab.on{color:#fff;border-bottom-color:var(--ss-accent)}',
-    '#ss-panel .ss-content{flex:1;overflow-y:auto;overflow-x:hidden;min-width:0;padding-bottom:28px}',
+    '#ss-panel .ss-body{flex:1;display:flex;min-height:0}',
+    '#ss-panel .ss-tabs{flex:0 0 150px;display:flex;flex-direction:column;gap:2px;padding:12px 8px;background:#0c0c0c;border-right:1px solid #222;overflow:auto}',
+    '#ss-panel .ss-tab{background:transparent;border:none;border-radius:8px;color:#a3a3a3;cursor:pointer;padding:9px 12px;font:13px/1.2 Segoe UI,sans-serif;text-align:left}',
+    '#ss-panel .ss-tab:hover{background:#1a1a1a;color:#eee}',
+    '#ss-panel .ss-tab.on{background:var(--ss-accent);color:#fff}',
+    '#ss-panel .ss-content{flex:1;overflow-y:auto;overflow-x:hidden;min-width:0;padding:8px 0 24px}',
     '#ss-panel .ss-page > .ss-sec:first-child{border-top:none}',
     '#ss-panel *{box-sizing:border-box}',
     '#ss-panel ::selection{background:var(--ss-accent);color:#fff}',
@@ -301,15 +304,16 @@
     '@keyframes ssSway{0%,100%{transform:rotate(-3.5deg)}50%{transform:rotate(3.5deg)}}',
     '@keyframes ssPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}',
     '@keyframes ssDrift{0%,100%{transform:translate(0,0)}25%{transform:translate(9px,-11px)}50%{transform:translate(-7px,-17px)}75%{transform:translate(-10px,-7px)}}',
-    '#ss-panel .ss-top{display:flex;align-items:center;gap:8px;padding:10px 10px 10px 16px;border-bottom:1px solid #2a2a2a;flex:0 0 auto;background:#1b1b1b}',
+    '#ss-panel .ss-top{display:flex;align-items:center;gap:10px;padding:0 12px 0 16px;height:56px;border-bottom:1px solid #222;flex:0 0 auto;background:#101010}',
+    '#ss-panel .ss-mark{width:28px;height:28px;border-radius:8px;background:#ff5500;flex:0 0 auto;box-shadow:0 4px 12px rgba(255,85,0,.35)}',
     '#ss-panel .ss-ttl{flex:1;min-width:0}',
-    '#ss-panel .ss-ttl b{display:block;font-size:14px;font-weight:600;color:#f2f2f2}',
-    '#ss-panel .ss-ttl i{display:block;font-style:normal;font-size:12px;color:#8a8a8a;margin-top:1px}',
-    '#ss-panel .ss-x{cursor:pointer;color:#9a9a9a;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:4px;font-size:14px;flex:0 0 auto}',
-    '#ss-panel .ss-x:hover{background:#2a2a2a;color:#fff}',
-    '#ss-panel .ss-sec{padding:14px 16px 6px}',
-    '#ss-panel .ss-sec + .ss-sec{border-top:1px solid #262626}',
-    '#ss-panel .ss-h{display:block;font-size:12px;font-weight:600;color:#9a9a9a;margin:0 0 8px}',
+    '#ss-panel .ss-ttl b{display:block;font-size:15px;font-weight:600;color:#fff;letter-spacing:.1px}',
+    '#ss-panel .ss-ttl i{display:block;font-style:normal;font-size:12px;color:#8d8d8d;margin-top:1px}',
+    '#ss-panel .ss-x{cursor:pointer;color:#9a9a9a;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:8px;font-size:15px;flex:0 0 auto}',
+    '#ss-panel .ss-x:hover{background:#222;color:#fff}',
+    '#ss-panel .ss-sec{margin:12px 14px 0;padding:14px 14px 8px;background:#181818;border:1px solid #2a2a2a;border-radius:12px}',
+    '#ss-panel .ss-sec + .ss-sec{border-top:1px solid #2a2a2a}',
+    '#ss-panel .ss-h{display:block;font-size:12px;font-weight:600;color:#f0f0f0;margin:0 0 10px}',
     '#ss-panel .ss-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:8px 0}',
     '#ss-panel .ss-row .ss-l{font-size:13.5px;color:#e6e6e8;font-weight:500}',
     '#ss-panel .ss-row .ss-d{font-size:11.5px;color:#74747a;margin-top:3px;line-height:1.4}',
@@ -1102,6 +1106,17 @@
     out.sort(function (a, b) { return a.t - b.t; });
     return out.length ? out : null;
   }
+  window.__ssStage = function (on) {
+    config.stageOpen = !!on;
+    var sw = document.getElementById('sw-stageOpen');
+    if (sw) sw.checked = !!on;
+  };
+  window.__ssVizClear = function (on) {
+    config.vizClear = !!on;
+    var sw = document.getElementById('sw-vizClear');
+    if (sw) sw.checked = !!on;
+    applyPageViz();
+  };
   window.__ssLyricOverlay = function (on) {
     config.lyricOverlay = !!on;
     var sw = document.getElementById('sw-lyricOverlay');
@@ -1168,6 +1183,8 @@
       text = lyr.lines[i].text || '';
       next = (lyr.lines[i + 1] && lyr.lines[i + 1].text) || '';
     }
+    if (!text && curTrack && curTrack.title) text = curTrack.title;
+    if (!text) return;
     var key = text + '\n' + next;
     if (key === pushedLyric) return;
     pushedLyric = key;
@@ -1307,17 +1324,20 @@
     panel = el('div', { id: 'ss-panel' });
 
     var top = el('div', { class: 'ss-top' });
+    top.appendChild(el('div', { class: 'ss-mark' }));
     var ttl = el('div', { class: 'ss-ttl' });
-    ttl.appendChild(el('b', null, 'Settings'));
-    ttl.appendChild(el('i', null, 'F1 closes this'));
+    ttl.appendChild(el('b', null, 'SoundCloud'));
+    ttl.appendChild(el('i', null, 'Settings  ·  F1'));
     top.appendChild(ttl);
     var x = el('div', { class: 'ss-x' }, '✕'); x.addEventListener('click', closePanel); top.appendChild(x);
     panel.appendChild(top);
 
+    var body = el('div', { class: 'ss-body' });
     var tabs = el('div', { class: 'ss-tabs' });
-    panel.appendChild(tabs);
     var content = el('div', { class: 'ss-content' });
-    panel.appendChild(content);
+    body.appendChild(tabs);
+    body.appendChild(content);
+    panel.appendChild(body);
     var pages = {}, firstTab = null;
     function addTab(id, label) {
       var b = el('button', { class: 'ss-tab', type: 'button' }); b.setAttribute('data-tab', id); b.textContent = label;
@@ -1559,6 +1579,7 @@
     viz.appendChild(vizSlider('Width', 'vizW', 240, 1400, 10, 'px'));
     viz.appendChild(vizSlider('Height', 'vizH', 40, 260, 4, 'px'));
     viz.appendChild(vizSlider('Opacity', 'vizOpacity', 30, 100, 5, '%', true));
+    viz.appendChild(toggleRow('Clear background', 'No dark plate behind the bars, on the page and in the F3 window', 'vizClear', function () { applyPageViz(); }));
     pgViz.appendChild(viz);
 
     var now = section('Now Playing');
@@ -1575,7 +1596,8 @@
     slRow.appendChild(slSel); now.appendChild(slRow);
     now.appendChild(el('div', { id: 'ss-sleep-note', class: 'ss-d', style: 'margin-top:6px' }, ''));
     now.appendChild(toggleRow('Lyrics', 'Tries LRCLIB, then Textyl, then lyrics.ovh. The lines follow the playhead.', 'lyrics', function () { renderLyrics(); }));
-    now.appendChild(toggleRow('Lyrics over other windows', 'One line, always on top. Drag it. F3 toggles it.', 'lyricOverlay', function (on) {
+    now.appendChild(toggleRow('Player over other windows', 'The floating SoundCloud window. F3 opens and closes it.', 'stageOpen'));
+    now.appendChild(toggleRow('Lyric line', 'Drag the words anywhere. They stay on the last line instead of going blank.', 'lyricOverlay', function (on) {
       pushedLyric = '';
       if (on) lyricTick();
     }));
@@ -1882,13 +1904,25 @@
     var needMenu = panelOpen && config.viz && vizCanvas;
     var needPage = config.vizOnPage && pageVizCanvas && pageVizCanvas.style.display !== 'none';
     var needNow = nowOpen && nowVizCanvas;
-    if (!needMenu && !needPage && !needNow) return;
+    var needStage = !!config.stageOpen;
+    if (!needMenu && !needPage && !needNow && !needStage) return;
     if ((vizFrame++ % 6) === 0) vizA = activeAnalyser();
     var style = config.vizStyle || 'bars';
     var opt = { rainbow: config.vizRainbow !== false, mirror: !!config.vizMirror, caps: config.vizCaps !== false, glow: true, style: style };
     if (needMenu) { if (!vizCanvas.width) resizeViz(); drawSpectrum(vizCanvas, 56, opt); }
     if (needPage) { var bars = Math.min(150, Math.max(40, Math.round(pageVizCanvas.width / 5))); drawSpectrum(pageVizCanvas, bars, { rainbow: opt.rainbow, mirror: opt.mirror, caps: opt.caps, glow: bars <= 110, style: style }); }
     if (needNow) { if (!nowVizCanvas.width) { nowVizCanvas.width = nowVizCanvas.clientWidth || 500; nowVizCanvas.height = 64; } drawSpectrum(nowVizCanvas, 72, opt); }
+    if (config.stageOpen && Bridge.stageViz && (vizFrame % 3) === 0) {
+      var bins = [];
+      var raw = null;
+      if (vizA) { raw = new Uint8Array(vizA.frequencyBinCount); vizA.getByteFrequencyData(raw); }
+      var barsN = 28;
+      for (var bi = 0; bi < barsN; bi++) {
+        var v = raw ? raw[Math.floor(Math.pow(bi / barsN, 1.25) * raw.length * 0.82)] / 255 : (0.18 + 0.12 * Math.sin(bi * 0.45 + Date.now() / 280));
+        bins.push(Math.max(0, Math.min(1, v)));
+      }
+      try { Bridge.stageViz({ bins: bins, accent: config.accent || '#ff5500', clear: !!config.vizClear }); } catch (e) {}
+    }
   }
   function positionPageViz() {
     if (!pageVizCanvas) return;
@@ -1898,8 +1932,9 @@
     pageVizCanvas.width = w; pageVizCanvas.height = h;
     var grab = vizEdit || panelOpen;
     var s = 'position:fixed;z-index:8;border-radius:12px;opacity:' + (config.vizOpacity != null ? config.vizOpacity : 0.85) + ';';
-    if (floating) s += 'left:' + config.vizX + '%;top:' + config.vizY + '%;transform:translate(-50%,-50%);width:' + w + 'px;height:' + h + 'px;background:rgba(10,10,12,.30);box-shadow:0 6px 22px rgba(0,0,0,.34);';
-    else s += 'left:0;bottom:54px;width:100vw;height:' + h + 'px;';
+    var plate = config.vizClear ? 'background:transparent;box-shadow:none;' : 'background:rgba(10,10,12,.28);box-shadow:0 6px 22px rgba(0,0,0,.34);';
+    if (floating) s += 'left:' + config.vizX + '%;top:' + config.vizY + '%;transform:translate(-50%,-50%);width:' + w + 'px;height:' + h + 'px;' + plate;
+    else s += 'left:0;bottom:54px;width:100vw;height:' + h + 'px;' + (config.vizClear ? 'background:transparent;' : '');
     s += grab
       ? 'pointer-events:auto;cursor:move;outline:2px dashed rgba(255,255,255,.6);outline-offset:3px;'
       : 'pointer-events:none;';
@@ -1949,12 +1984,15 @@
     else if (e.key === 'F2') { e.preventDefault(); e.stopPropagation(); toggleNow(); }
     else if (e.key === 'F3' && !typingTarget(e)) {
       e.preventDefault();
-      config.lyricOverlay = !config.lyricOverlay;
+      config.stageOpen = !config.stageOpen;
+      if (config.stageOpen) config.lyricOverlay = true;
+      var stSw = document.getElementById('sw-stageOpen');
       var lySw = document.getElementById('sw-lyricOverlay');
+      if (stSw) stSw.checked = !!config.stageOpen;
       if (lySw) lySw.checked = !!config.lyricOverlay;
       pushedLyric = '';
-      save({ lyricOverlay: !!config.lyricOverlay });
-      if (config.lyricOverlay) lyricTick();
+      save({ stageOpen: !!config.stageOpen, lyricOverlay: !!config.lyricOverlay });
+      if (config.stageOpen || config.lyricOverlay) lyricTick();
     }
     else if (e.key === 'Escape') { if (nowOpen) { e.preventDefault(); closeNow(); } else if (panelOpen) closePanel(); }
     else if (!typingTarget(e) && nowOpen && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {

@@ -49,9 +49,12 @@
     }
     window.addEventListener('mouseup', endDrag);
     window.addEventListener('blur', endDrag);
+    let held = '';
     ipcRenderer.on('lyric-line', (e, d) => {
       const text = (d && d.text) || '';
-      cur.textContent = text || '…';
+      if (!text) return;
+      held = text;
+      cur.textContent = text;
       next.textContent = (d && d.next) || '';
     });
   </script>

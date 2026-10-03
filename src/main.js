@@ -77,7 +77,11 @@ const DEFAULT_CONFIG = {
   miniY: null,
   lyricOverlay: false,
   lyricX: null,
-  lyricY: null
+  lyricY: null,
+  stageOpen: false,
+  stageX: null,
+  stageY: null,
+  vizClear: false
 };
 
 function configPath() {
@@ -605,6 +609,56 @@ function closeLyricWindow() {
   if (lyricWindow && !lyricWindow.isDestroyed()) { lyricWindow.destroy(); lyricWindow = null; }
 }
 
+let stageWindow = null;
+let stageDrag = null;
+let lastStageTrack = null;
+function stopStageDrag() {
+  if (!stageDrag) return;
+  clearInterval(stageDrag.timer);
+  stageDrag = null;
+  if (stageWindow && !stageWindow.isDestroyed()) {
+    const b = stageWindow.getBounds();
+    config.stageX = b.x;
+    config.stageY = b.y;
+    scheduleSave();
+  }
+}
+function createStageWindow() {
+  if (stageWindow && !stageWindow.isDestroyed()) { stageWindow.show(); return; }
+  let x, y;
+  try {
+    const wa = screen.getPrimaryDisplay().workArea;
+    x = wa.x + wa.width - 440;
+    y = wa.y + 28;
+  } catch (e) {}
+  if (Number.isFinite(config.stageX) && Number.isFinite(config.stageY)) { x = config.stageX; y = config.stageY; }
+  stageWindow = new BrowserWindow({
+    width: 420, height: 196, x: x, y: y,
+    frame: false, resizable: false, alwaysOnTop: true, skipTaskbar: true,
+    transparent: true, backgroundColor: '#00000000',
+    maximizable: false, minimizable: false, fullscreenable: false,
+    webPreferences: { nodeIntegration: true, contextIsolation: false, backgroundThrottling: false }
+  });
+  stageWindow.setAlwaysOnTop(true, 'floating');
+  stageWindow.loadFile(path.join(__dirname, 'stage.html'));
+  stageWindow.webContents.on('did-finish-load', () => {
+    if (lastStageTrack && stageWindow && !stageWindow.isDestroyed()) stageWindow.webContents.send('stage-np', lastStageTrack);
+  });
+  stageWindow.on('closed', () => {
+    if (stageDrag) { clearInterval(stageDrag.timer); stageDrag = null; }
+    stageWindow = null;
+    if (config.stageOpen) {
+      config.stageOpen = false;
+      scheduleSave();
+      pageCall('__ssStage', false);
+    }
+  });
+}
+function closeStageWindow() {
+  stopStageDrag();
+  if (stageWindow && !stageWindow.isDestroyed()) { stageWindow.destroy(); stageWindow = null; }
+}
+
 async function loadExtensions() {
   const dir = extensionsDir();
   try {
@@ -644,6 +698,7 @@ function registerIpc() {
     if ('globalHotkeys' in patch) registerHotkeys();
     if ('miniPlayer' in patch) { config.miniPlayer ? createMiniWindow() : closeMiniWindow(); }
     if ('lyricOverlay' in patch) { config.lyricOverlay ? createLyricWindow() : closeLyricWindow(); }
+    if ('stageOpen' in patch) { config.stageOpen ? createStageWindow() : closeStageWindow(); }
     if ('zoom' in patch) applyZoom();
     if ('alwaysOnTop' in patch && mainWindow && !mainWindow.isDestroyed()) mainWindow.setAlwaysOnTop(!!config.alwaysOnTop);
     if ('lyrics' in patch && config.lyrics) { lastNpKey = ''; if (presence && presence.last) handleNowPlaying(presence.last); }
@@ -655,9 +710,12 @@ function registerIpc() {
     if (presence) presence.update(data);
     handleNowPlaying(data);
     if (miniWindow && !miniWindow.isDestroyed()) miniWindow.webContents.send('mini-np', data);
+    lastStageTrack = data;
+    if (stageWindow && !stageWindow.isDestroyed()) stageWindow.webContents.send('stage-np', data);
   });
   ipcMain.on('now-tick', (_e, data) => {
     if (miniWindow && !miniWindow.isDestroyed()) miniWindow.webContents.send('mini-tick', data);
+    if (stageWindow && !stageWindow.isDestroyed()) stageWindow.webContents.send('stage-tick', data);
   });
   ipcMain.on('ss-open-external', (_e, url) => { shell.openExternal(url).catch(() => {}); });
   ipcMain.on('ss-control', (_e, action) => pageControl(action));
@@ -710,6 +768,31 @@ function registerIpc() {
     };
   });
   ipcMain.on('lyric-drag-end', () => stopLyricDrag());
+  ipcMain.on('ss-stage-viz', (_e, data) => {
+    if (stageWindow && !stageWindow.isDestroyed()) stageWindow.webContents.send('stage-viz', data);
+  });
+  ipcMain.on('stage-close', () => {
+    config.stageOpen = false;
+    scheduleSave();
+    pageCall('__ssStage', false);
+    closeStageWindow();
+  });
+  ipcMain.on('stage-drag-start', () => {
+    if (!stageWindow || stageWindow.isDestroyed()) return;
+    stopStageDrag();
+    const cursor = screen.getCursorScreenPoint();
+    const b = stageWindow.getBounds();
+    const ox = cursor.x - b.x;
+    const oy = cursor.y - b.y;
+    stageDrag = {
+      timer: setInterval(() => {
+        if (!stageWindow || stageWindow.isDestroyed()) { stopStageDrag(); return; }
+        const c = screen.getCursorScreenPoint();
+        stageWindow.setPosition(Math.round(c.x - ox), Math.round(c.y - oy));
+      }, 16)
+    };
+  });
+  ipcMain.on('stage-drag-end', () => stopStageDrag());
   ipcMain.on('ss-log', (_e, msg) => log.w('[ui] ' + msg));
 
   ipcMain.handle('ss-pick-image', async () => {
@@ -755,6 +838,7 @@ if (!gotLock) {
     registerHotkeys();
     if (config.miniPlayer) createMiniWindow();
     if (config.lyricOverlay) createLyricWindow();
+    if (config.stageOpen) createStageWindow();
 
     createSplash();
     createMainWindow();

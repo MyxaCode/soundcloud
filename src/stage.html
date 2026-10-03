@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-user-select: none; user-select: none; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: transparent;
+    font-family: 'Segoe UI', system-ui, sans-serif; color: #fff; }
+  .shell { width: 100%; height: 100%; display: flex; flex-direction: column; gap: 6px; }
+  .card { flex: 1; min-height: 0; border-radius: 16px; background: #141414; border: 1px solid #2a2a2a;
+    box-shadow: 0 16px 40px rgba(0,0,0,.45); display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px; position: relative; cursor: grab; }
+  .art { width: 72px; height: 72px; border-radius: 10px; flex: 0 0 auto;
+    background: #222 center/cover no-repeat; }
+  .meta { flex: 1; min-width: 0; }
+  .t { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .a { margin-top: 2px; font-size: 12px; color: #a3a3a3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .prog { margin-top: 10px; height: 3px; border-radius: 3px; background: #2a2a2a; overflow: hidden; }
+  .prog i { display: block; height: 100%; width: 0; background: #ff5500; }
+  .ctl { display: flex; align-items: center; gap: 2px; cursor: default; }
+  .b { width: 32px; height: 32px; border: none; background: transparent; color: #eee; border-radius: 8px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .b:hover { background: #222; }
+  .b.play { width: 38px; height: 38px; border-radius: 50%; background: #fff; color: #111; }
+  .b.play:hover { background: #fff; filter: brightness(.94); }
+  .b svg { width: 18px; height: 18px; }
+  .x { position: absolute; top: 8px; right: 8px; width: 22px; height: 22px; border: none; border-radius: 6px;
+    background: transparent; color: #888; cursor: pointer; font-size: 13px; }
+  .x:hover { color: #fff; background: #222; }
+  .viz { height: 46px; width: 100%; border-radius: 12px; background: rgba(12,12,12,.72); }
+  .viz.clear { background: transparent; }
+  canvas { width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+  <div class="shell">
+    <div class="card" id="card">
+      <div class="art" id="art"></div>
+      <div class="meta">
+        <div class="t" id="t">SoundCloud</div>
+        <div class="a" id="a">Nothing playing</div>
+        <div class="prog"><i id="prog"></i></div>
+      </div>
+      <div class="ctl" id="ctl">
+        <button class="b" id="prev" title="Previous"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 6h2v12H7zM20 6v12l-9-6z"/></svg></button>
+        <button class="b play" id="play" title="Play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+        <button class="b" id="next" title="Next"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15 6h2v12h-2zM4 6l9 6-9 6z"/></svg></button>
+      </div>
+      <button class="x" id="close" title="Close">✕</button>
+    </div>
+    <div class="viz" id="vizbox"><canvas id="viz"></canvas></div>
+  </div>
+  <script>
+    const { ipcRenderer } = require('electron');
+    const $ = (id) => document.getElementById(id);
+    const ICON_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+    const ICON_PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>';
+    let dragging = false;
+    let accent = '#ff5500';
+    let clear = false;
+    let playMode = '';
+    $('prev').onclick = () => ipcRenderer.send('ss-control', 'prev');
+    $('next').onclick = () => ipcRenderer.send('ss-control', 'next');
+    $('play').onclick = () => ipcRenderer.send('ss-control', 'playpause');
+    $('close').onclick = (e) => { e.stopPropagation(); ipcRenderer.send('stage-close'); };
+    $('card').addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      if (e.target.closest('#ctl') || e.target.id === 'close') return;
+      dragging = true;
+      ipcRenderer.send('stage-drag-start');
+      e.preventDefault();
+    });
+    function endDrag() {
+      if (!dragging) return;
+      dragging = false;
+      ipcRenderer.send('stage-drag-end');
+    }
+    window.addEventListener('mouseup', endDrag);
+    window.addEventListener('blur', endDrag);
+    function setPlay(playing) {
+      const mode = playing ? 'pause' : 'play';
+      if (playMode === mode) return;
+      playMode = mode;
+      $('play').innerHTML = playing ? ICON_PAUSE : ICON_PLAY;
+    }
+    ipcRenderer.on('stage-np', (e, d) => {
+      if (!d || !d.title) {
+        $('t').textContent = 'SoundCloud';
+        $('a').textContent = 'Nothing playing';
+        $('art').style.backgroundImage = '';
+        setPlay(false);
+        return;
+      }
+      $('t').textContent = d.title;
+      $('a').textContent = d.artist || 'SoundCloud';
+      $('art').style.backgroundImage = d.artwork ? 'url("' + d.artwork + '")' : '';
+      setPlay(!!d.playing);
+    });
+    let tick = { now: 0, max: 0, playing: false, at: 0 };
+    ipcRenderer.on('stage-tick', (e, d) => {
+      if (!d) return;
+      tick = { now: d.now || 0, max: d.max || 0, playing: !!d.playing, at: Date.now() };
+      setPlay(tick.playing);
+    });
+    function frame() {
+      requestAnimationFrame(frame);
+      let now = tick.now;
+      if (tick.playing) now += (Date.now() - tick.at) / 1000;
+      const p = tick.max > 0 ? Math.max(0, Math.min(100, now / tick.max * 100)) : 0;
+      $('prog').style.width = p + '%';
+    }
+    frame();
+    const canvas = $('viz');
+    const box = $('vizbox');
+    function draw(bins) {
+      const w = canvas.width = box.clientWidth || 360;
+      const h = canvas.height = box.clientHeight || 46;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, w, h);
+      const n = bins.length || 1;
+      const gap = 3;
+      const bw = Math.max(2, (w - gap * (n - 1)) / n);
+      bins.forEach((v, i) => {
+        const bh = Math.max(2, v * (h - 4));
+        ctx.fillStyle = accent;
+        const x = i * (bw + gap);
+        const y = h - bh;
+        const r = Math.min(2, bw / 2);
+        ctx.beginPath();
+        ctx.moveTo(x, h);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.lineTo(x + bw - r, y);
+        ctx.quadraticCurveTo(x + bw, y, x + bw, y + r);
+        ctx.lineTo(x + bw, h);
+        ctx.fill();
+      });
+    }
+    ipcRenderer.on('stage-viz', (e, d) => {
+      if (!d) return;
+      if (d.accent) accent = d.accent;
+      $('prog').style.background = accent;
+      clear = !!d.clear;
+      box.classList.toggle('clear', clear);
+      draw(d.bins || []);
+    });
+  </script>
+</body>
+</html>
