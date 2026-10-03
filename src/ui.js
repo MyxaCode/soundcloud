@@ -588,7 +588,9 @@
       css += '.playControls,.playControls__bg,.playControls__inner,.playControls__wrapper,.playControls .playControls__inner{background:' + bbg + '!important;background-color:' + bbg + '!important;background-image:none!important;border:none!important;' + edge + '}';
       css += '.playControls{' + (ba < 0.9 ? blur : '') + '}';
       css += '.playControls:before,.playControls:after,.playControls__bg:before,.playControls__bg:after{background:transparent!important;background-image:none!important;box-shadow:none!important}';
-      css += '.playControls .sc-button:not(.playControls__play):not(.playControl),.playControls button:not(.playControls__play):not(.playControl),.playControls a.sc-button{background-color:transparent!important;box-shadow:none!important;border-color:transparent!important}';
+      css += '.playControls .sc-button:not(.playControls__play):not(.sc-button-play),.playControls button:not(.playControls__play):not(.sc-button-play),.playControls a.sc-button:not(.sc-button-play){background-color:transparent!important;background-image:none!important;box-shadow:none!important;border-color:transparent!important}';
+      css += '.playControls .sc-button:not(.playControls__play):not(.sc-button-play) svg,.playControls button:not(.playControls__play):not(.sc-button-play) svg{filter:drop-shadow(0 0 1px rgba(0,0,0,.9)) drop-shadow(0 1px 2px rgba(0,0,0,.75))}';
+      css += '.playControls .sc-button:not(.playControls__play):not(.sc-button-play) svg path,.playControls button:not(.playControls__play):not(.sc-button-play) svg path{fill:#fff!important}';
       if (ba < 0.55) {
         css += '.playControls .playbackSoundBadge__titleLink,.playControls .playbackSoundBadge__lightLink,.playControls .playbackTimeline__timePassed,.playControls .playbackTimeline__duration,.playControls .playbackTimeline__duration span{text-shadow:0 1px 2px rgba(0,0,0,.75)}';
       }
@@ -634,6 +636,8 @@
       n.style.removeProperty('border-color');
       n.style.removeProperty('backdrop-filter');
       n.style.removeProperty('-webkit-backdrop-filter');
+      n.style.removeProperty('filter');
+      n.style.removeProperty('fill');
     }
     chromeTouched = [];
   }
@@ -668,11 +672,22 @@
     for (var i = 0; i < nodes.length; i++) {
       var n = nodes[i];
       if (!n.classList) continue;
-      if (n.classList.contains('playControls__play') || n.classList.contains('playControl')) continue;
+      if (n.classList.contains('playControls__play') || n.classList.contains('sc-button-play')) continue;
       n.style.setProperty('background-color', 'transparent', 'important');
+      n.style.setProperty('background-image', 'none', 'important');
       n.style.setProperty('box-shadow', 'none', 'important');
       n.style.setProperty('border-color', 'transparent', 'important');
       chromeRemember(n);
+      var paths = n.querySelectorAll('svg path, svg circle, svg rect, svg polygon');
+      for (var p = 0; p < paths.length; p++) {
+        paths[p].style.setProperty('fill', '#fff', 'important');
+        chromeRemember(paths[p]);
+      }
+      var svgs = n.querySelectorAll('svg');
+      for (var s = 0; s < svgs.length; s++) {
+        svgs[s].style.setProperty('filter', 'drop-shadow(0 0 1px rgba(0,0,0,.9)) drop-shadow(0 1px 2px rgba(0,0,0,.75))', 'important');
+        chromeRemember(svgs[s]);
+      }
     }
   }
   function paintChrome() {
@@ -1167,39 +1182,57 @@
       var nodes = nowUI.lns.children;
       for (var n = 0; n < nodes.length; n++) nodes[n].classList.toggle('on', n === i);
       if (i >= 0 && nodes[i]) {
-        var boxH = nowUI.lyrBox.clientHeight || 230;
-        var line = nodes[i];
-        var center = line.offsetTop + line.offsetHeight / 2;
-        nowUI.lns.style.transform = 'translateY(' + (boxH / 2 - center) + 'px)';
+        var boxRect = nowUI.lyrBox.getBoundingClientRect();
+        var lineRect = nodes[i].getBoundingClientRect();
+        var delta = (boxRect.top + boxRect.height / 2) - (lineRect.top + lineRect.height / 2);
+        var prev = nowUI.lns._ty || 0;
+        var nextY = prev + delta;
+        nowUI.lns._ty = nextY;
+        nowUI.lns.style.transform = 'translateY(' + nextY + 'px)';
       }
     } else if (!canScroll) {
       lyr.idx = i;
     }
     pushOverlay(i);
   }
+  function clockSeconds(text) {
+    var raw = String(text || '').replace(/\s+/g, ' ').trim();
+    if (!raw || raw.charAt(0) === '-' || raw.charAt(0) === '\u2212') return null;
+    var m = raw.match(/(\d+)\s*:\s*(\d{2})/);
+    if (!m) return null;
+    return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+  }
   function readPlayerTime() {
+    var passedEl = document.querySelector('.playbackTimeline__timePassed');
+    var shown = passedEl ? clockSeconds(passedEl.textContent) : null;
+    var wrap = document.querySelector('.playbackTimeline__progressWrapper');
+    var ariaNow = NaN, ariaMax = 0;
+    if (wrap) {
+      ariaNow = parseFloat(wrap.getAttribute('aria-valuenow'));
+      ariaMax = parseFloat(wrap.getAttribute('aria-valuemax'));
+      if (isFinite(ariaMax) && ariaMax > 10000) { ariaNow = ariaNow / 1000; ariaMax = ariaMax / 1000; }
+    }
     var list = [].slice.call(document.getElementsByTagName('audio'))
       .concat([].slice.call(document.getElementsByTagName('video')))
       .concat(mediaEls);
-    var best = null;
+    var audioNow = null, audioMax = 0;
     for (var i = 0; i < list.length; i++) {
       var a = list[i];
-      if (!a || !isFinite(a.currentTime) || a.currentTime < 0.05) continue;
-      if (!best) { best = a; continue; }
-      if (best.paused && !a.paused) best = a;
-      else if (!a.paused && a.currentTime > best.currentTime) best = a;
+      if (!a || !isFinite(a.currentTime) || a.currentTime < 0) continue;
+      if (a.paused && a.currentTime < 0.05) continue;
+      if (audioNow == null || (!a.paused && a.currentTime >= audioNow)) {
+        audioNow = a.currentTime;
+        if (isFinite(a.duration) && a.duration > 1) audioMax = a.duration;
+      }
     }
-    if (best) {
-      var maxA = (isFinite(best.duration) && best.duration > 1) ? best.duration : 0;
-      return { now: best.currentTime, max: maxA };
-    }
-    var wrap = document.querySelector('.playbackTimeline__progressWrapper');
-    if (!wrap) return null;
-    var now = parseFloat(wrap.getAttribute('aria-valuenow'));
-    var max = parseFloat(wrap.getAttribute('aria-valuemax'));
-    if (!isFinite(now)) return null;
-    if (isFinite(max) && max > 10000) { now = now / 1000; max = max / 1000; }
-    return { now: now, max: isFinite(max) ? max : 0 };
+    var now = null;
+    if (shown != null) now = shown;
+    else if (isFinite(ariaNow)) now = ariaNow;
+    var max = audioMax || (isFinite(ariaMax) && ariaMax > 1 ? ariaMax : 0);
+    if (audioNow != null && now != null && Math.abs(audioNow - now) < 2.5) now = audioNow;
+    else if (now == null && audioNow != null) now = audioNow;
+    if (now == null) return null;
+    return { now: now, max: max };
   }
   function lyricTick() {
     if (!nowOpen && !config.lyricOverlay) return;
