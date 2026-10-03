@@ -54,7 +54,24 @@ const DEFAULT_CONFIG = {
   autoAccent: false,
   lyrics: false,
   miniPlayer: false,
-  cssThemes: []
+  cssThemes: [],
+
+  clearBar: true,
+  headerAlpha: 0,
+  barAlpha: 0,
+  barBlur: false,
+  pageTheme: '',
+  zoom: 100,
+  alwaysOnTop: false,
+  startPage: 'discover',
+  mono: false,
+  leveler: false,
+  history: [],
+  winW: 1280,
+  winH: 820,
+  winX: null,
+  winY: null,
+  winMax: false
 };
 
 function configPath() {
@@ -112,7 +129,56 @@ let splash = null;
 let tray = null;
 let miniWindow = null;
 
-const SC_URL = 'https://soundcloud.com/discover';
+const START_URLS = {
+  discover: 'https://soundcloud.com/discover',
+  stream: 'https://soundcloud.com/feed',
+  likes: 'https://soundcloud.com/you/likes',
+  library: 'https://soundcloud.com/you/library',
+  history: 'https://soundcloud.com/you/history'
+};
+function startUrl() {
+  return START_URLS[config.startPage] || START_URLS.discover;
+}
+function clampZoom(v) {
+  var n = Number(v);
+  if (!isFinite(n)) n = 100;
+  return Math.max(70, Math.min(160, n)) / 100;
+}
+function applyZoom() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  try { mainWindow.webContents.setZoomFactor(clampZoom(config.zoom)); } catch (e) {}
+}
+function rememberWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  var max = mainWindow.isMaximized();
+  var patch = { winMax: max };
+  if (!max) {
+    var b = mainWindow.getBounds();
+    patch.winW = b.width;
+    patch.winH = b.height;
+    patch.winX = b.x;
+    patch.winY = b.y;
+  }
+  config = Object.assign({}, config, patch);
+  scheduleSave();
+}
+function initialBounds() {
+  var width = (Number.isFinite(config.winW) && config.winW >= 980) ? config.winW : 1280;
+  var height = (Number.isFinite(config.winH) && config.winH >= 600) ? config.winH : 820;
+  var bounds = { width: width, height: height };
+  if (!Number.isFinite(config.winX) || !Number.isFinite(config.winY)) return bounds;
+  try {
+    var screen = require('electron').screen;
+    var displays = screen.getAllDisplays();
+    var x = config.winX, y = config.winY;
+    var visible = displays.some(function (d) {
+      var a = d.workArea;
+      return x < a.x + a.width - 80 && x + width > a.x + 80 && y < a.y + a.height - 80 && y + height > a.y + 40;
+    });
+    if (visible) { bounds.x = x; bounds.y = y; }
+  } catch (e) {}
+  return bounds;
+}
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
           '(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
 
@@ -277,9 +343,9 @@ function setupSession() {
     });
   });
 
-  if (config.adBlock) {
-    ses.webRequest.onBeforeRequest({ urls: AD_HOSTS }, (_d, cb) => cb({ cancel: true }));
-  }
+  ses.webRequest.onBeforeRequest({ urls: AD_HOSTS }, (_d, cb) => {
+    cb({ cancel: !!config.adBlock });
+  });
 }
 
 function createSplash() {
@@ -299,9 +365,10 @@ function createSplash() {
 }
 
 function createMainWindow() {
-  mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 820,
+  var bounds = initialBounds();
+  var winOpts = {
+    width: bounds.width,
+    height: bounds.height,
     minWidth: 980,
     minHeight: 600,
     show: false,
@@ -317,10 +384,21 @@ function createMainWindow() {
       spellcheck: false,
       backgroundThrottling: false
     }
-  });
+  };
+  if (Number.isFinite(bounds.x) && Number.isFinite(bounds.y)) {
+    winOpts.x = bounds.x;
+    winOpts.y = bounds.y;
+  }
+  mainWindow = new BrowserWindow(winOpts);
 
   mainWindow.webContents.setUserAgent(UA);
-  mainWindow.loadURL(SC_URL, { userAgent: UA });
+  if (config.alwaysOnTop) mainWindow.setAlwaysOnTop(true);
+  if (config.winMax) mainWindow.maximize();
+  var rememberOk = false;
+  mainWindow.on('show', function () { setTimeout(function () { rememberOk = true; }, 500); });
+  mainWindow.on('resize', function () { if (rememberOk) rememberWindow(); });
+  mainWindow.on('move', function () { if (rememberOk) rememberWindow(); });
+  mainWindow.loadURL(startUrl(), { userAgent: UA });
 
   let shown = false;
   const reveal = () => {
@@ -332,7 +410,7 @@ function createMainWindow() {
       mainWindow.focus();
     }
   };
-  mainWindow.webContents.on('did-finish-load', reveal);
+  mainWindow.webContents.on('did-finish-load', function () { applyZoom(); reveal(); });
   setTimeout(reveal, 12000);
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -381,10 +459,10 @@ function createMiniWindow() {
   try {
     const { screen } = require('electron');
     const wa = screen.getPrimaryDisplay().workArea;
-    x = wa.x + wa.width - 360; y = wa.y + wa.height - 128;
+    x = wa.x + wa.width - 360; y = wa.y + wa.height - 136;
   } catch (e) {}
   miniWindow = new BrowserWindow({
-    width: 344, height: 102, x: x, y: y,
+    width: 344, height: 118, x: x, y: y,
     frame: false, resizable: false, alwaysOnTop: true, skipTaskbar: true,
     transparent: true, backgroundColor: '#00000000', icon: appIcon(),
     maximizable: false, minimizable: false, fullscreenable: false,
@@ -440,6 +518,8 @@ function registerIpc() {
     if ('minimizeToTray' in patch && config.minimizeToTray) setupTray();
     if ('globalHotkeys' in patch) registerHotkeys();
     if ('miniPlayer' in patch) { config.miniPlayer ? createMiniWindow() : closeMiniWindow(); }
+    if ('zoom' in patch) applyZoom();
+    if ('alwaysOnTop' in patch && mainWindow && !mainWindow.isDestroyed()) mainWindow.setAlwaysOnTop(!!config.alwaysOnTop);
     if ('lyrics' in patch && config.lyrics) { lastNpKey = ''; if (presence && presence.last) handleNowPlaying(presence.last); }
     if ('autoAccent' in patch && config.autoAccent) { lastNpKey = ''; if (presence && presence.last) handleNowPlaying(presence.last); }
   });
@@ -448,7 +528,10 @@ function registerIpc() {
     log.w('[ipc] now-playing: title=' + (data && data.title) + ' playing=' + (data && data.playing) + ' artwork=' + (data && data.artwork ? 'yes' : 'no'));
     if (presence) presence.update(data);
     handleNowPlaying(data);
-    if (miniWindow) miniWindow.webContents.send('mini-np', data);
+    if (miniWindow && !miniWindow.isDestroyed()) miniWindow.webContents.send('mini-np', data);
+  });
+  ipcMain.on('now-tick', (_e, data) => {
+    if (miniWindow && !miniWindow.isDestroyed()) miniWindow.webContents.send('mini-tick', data);
   });
   ipcMain.on('ss-open-external', (_e, url) => { shell.openExternal(url).catch(() => {}); });
   ipcMain.on('ss-control', (_e, action) => pageControl(action));

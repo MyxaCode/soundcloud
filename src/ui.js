@@ -55,7 +55,18 @@
     autoAccent: false,
     lyrics: false,
     miniPlayer: false,
-    cssThemes: []
+    cssThemes: [],
+    clearBar: true,
+    headerAlpha: 0,
+    barAlpha: 0,
+    barBlur: false,
+    pageTheme: '',
+    zoom: 100,
+    alwaysOnTop: false,
+    startPage: 'discover',
+    mono: false,
+    leveler: false,
+    history: []
   };
 
   var config = Object.assign({}, DEFAULTS, Bridge.getConfig() || {});
@@ -63,6 +74,9 @@
   if (!config.accent) config.accent = '#ff5500';
   if (!Array.isArray(config.images)) config.images = [];
   if (!Array.isArray(config.cssThemes)) config.cssThemes = [];
+  if (!Array.isArray(config.history)) config.history = [];
+  if (typeof config.headerAlpha !== 'number') config.headerAlpha = 0;
+  if (typeof config.barAlpha !== 'number') config.barAlpha = 0;
 
   var pendingPatch = {}, saveTimer = null;
   function save(patch) {
@@ -153,9 +167,42 @@
         lfo.connect(lfoGain); lfoGain.connect(panner.pan); lfo.start();
       } catch (e) {}
     }
+    var leveler = ctx.createDynamicsCompressor();
+    leveler.threshold.value = config.leveler ? -20 : 0;
+    leveler.knee.value = 10;
+    leveler.ratio.value = config.leveler ? 3.2 : 1;
+    leveler.attack.value = 0.012;
+    leveler.release.value = 0.22;
+    limiter.connect(leveler);
+    var bypass = ctx.createGain();
+    bypass.gain.value = config.mono ? 0 : 1;
+    var monoOut = ctx.createGain();
+    monoOut.gain.value = config.mono ? 1 : 0;
+    var tail = ctx.createGain();
+    leveler.connect(bypass);
+    bypass.connect(tail);
+    try {
+      var splitter = ctx.createChannelSplitter(2);
+      var merger = ctx.createChannelMerger(2);
+      var gl = ctx.createGain();
+      var gr = ctx.createGain();
+      gl.gain.value = 0.5; gr.gain.value = 0.5;
+      leveler.connect(splitter);
+      splitter.connect(gl, 0);
+      splitter.connect(gr, 1);
+      gl.connect(merger, 0, 0);
+      gr.connect(merger, 0, 0);
+      gl.connect(merger, 0, 1);
+      gr.connect(merger, 0, 1);
+      merger.connect(monoOut);
+      monoOut.connect(tail);
+    } catch (e) {
+      bypass.gain.value = 1;
+      monoOut.gain.value = 0;
+    }
     var analyser = null;
-    try { analyser = ctx.createAnalyser(); analyser.fftSize = 256; analyser.smoothingTimeConstant = 0.78; limiter.connect(analyser); } catch (e) {}
-    var chain = { input: input, output: limiter, filters: filters, bass: bass, boost: boost, panner: panner, wet: wet, dry: dry, lfo: lfo, lfoGain: lfoGain, analyser: analyser };
+    try { analyser = ctx.createAnalyser(); analyser.fftSize = 256; analyser.smoothingTimeConstant = 0.78; tail.connect(analyser); } catch (e) {}
+    var chain = { input: input, output: tail, filters: filters, bass: bass, boost: boost, panner: panner, wet: wet, dry: dry, lfo: lfo, lfoGain: lfoGain, analyser: analyser, leveler: leveler, bypass: bypass, monoOut: monoOut };
     eqChains.push(chain);
     return chain;
   }
@@ -201,6 +248,21 @@
     }
   }
   function applyReverb() { for (var c = 0; c < eqChains.length; c++) if (eqChains[c].wet) eqChains[c].wet.gain.value = (config.fxReverb || 0) / 100; }
+  function applyLeveler() {
+    for (var c = 0; c < eqChains.length; c++) {
+      var lv = eqChains[c].leveler;
+      if (!lv) continue;
+      lv.ratio.value = config.leveler ? 3.2 : 1;
+      lv.threshold.value = config.leveler ? -20 : 0;
+    }
+  }
+  function applyMono() {
+    for (var c = 0; c < eqChains.length; c++) {
+      var ch = eqChains[c];
+      if (ch.bypass) ch.bypass.gain.value = config.mono ? 0 : 1;
+      if (ch.monoOut) ch.monoOut.gain.value = config.mono ? 1 : 0;
+    }
+  }
   var mediaEls = [];
   function trackMediaEl(el) { if (el && mediaEls.indexOf(el) === -1) mediaEls.push(el); }
   function applySpeed() {
@@ -222,7 +284,7 @@
     '::-webkit-scrollbar-thumb{background:#28282b;border-radius:6px}',
     '::-webkit-scrollbar-thumb:hover{background:#37373b}',
     '#ss-panel{--ss-accent:#ff5500;position:fixed;top:0;right:0;height:100%;width:396px;z-index:2147483646;box-sizing:border-box;',
-    'background:#0e0e10;border-left:1px solid #202023;color:#ededed;font:13px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;box-shadow:-22px 0 60px rgba(0,0,0,.5);',
+    'background:#101012;border-left:1px solid #1c1c1f;color:#ededed;font:13px/1.45 -apple-system,Segoe UI,Roboto,sans-serif;box-shadow:-8px 0 24px rgba(0,0,0,.28);',
     'overflow:hidden;display:flex;flex-direction:column;transform:translateX(101%);transition:transform .28s cubic-bezier(.16,1,.3,1)}',
     '#ss-panel.open{transform:none}',
     '#ss-panel .ss-body{flex:1;display:flex;min-height:0}',
@@ -251,8 +313,7 @@
     '#ss-panel .ss-x:hover{background:#1d1d20;color:#fff}',
     '#ss-panel .ss-sec{padding:17px 20px}',
     '#ss-panel .ss-sec + .ss-sec{border-top:1px solid #19191c}',
-    '#ss-panel .ss-h{display:flex;align-items:center;gap:8px;font-size:10.5px;font-weight:700;color:#7c7c83;margin:0 0 14px;letter-spacing:1.5px;text-transform:uppercase}',
-    '#ss-panel .ss-h:before{content:"";width:3px;height:11px;border-radius:2px;background:var(--ss-accent);flex:0 0 auto}',
+    '#ss-panel .ss-h{display:block;font-size:11px;font-weight:600;color:#8a8a90;margin:0 0 12px;letter-spacing:.08em;text-transform:uppercase}',
     '#ss-panel .ss-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:8px 0}',
     '#ss-panel .ss-row .ss-l{font-size:13.5px;color:#e6e6e8;font-weight:500}',
     '#ss-panel .ss-row .ss-d{font-size:11.5px;color:#74747a;margin-top:3px;line-height:1.4}',
@@ -283,7 +344,7 @@
     '#ss-viz-dock{width:100%;margin-top:8px;background:#19191c;color:#bdbdc2;border:1px solid #26262c;border-radius:9px;padding:8px;font-size:11.5px;font-weight:600;cursor:pointer;transition:.15s}',
     '#ss-viz-dock:hover{border-color:var(--ss-accent);color:#fff}',
     '.ss-vrow{display:flex;align-items:center;gap:12px;margin-top:13px}',
-    '.ss-vrow .ss-vlbl{font-size:13px;color:#e6e6e8;font-weight:500;flex:0 0 60px}',
+    '.ss-vrow .ss-vlbl{font-size:13px;color:#e6e6e8;font-weight:500;flex:0 0 86px}',
     '.ss-vrow input{flex:1}',
     '.ss-vrow .ss-vval{font-size:12px;color:var(--ss-accent);min-width:46px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums}',
     '#ss-bass-row,#ss-boost-row{display:flex;align-items:center;gap:13px;margin-top:14px}',
@@ -356,7 +417,25 @@
     '#ss-now .nlyr .ln.on{color:#fff;font-size:22px;font-weight:800}',
     '#ss-now .nlyr.empty{display:flex;align-items:center;color:#86868e;font-size:15px}',
     '#ss-now .nx{position:absolute;top:24px;right:28px;z-index:3;width:40px;height:40px;border-radius:11px;border:none;background:rgba(255,255,255,.08);color:#fff;font-size:17px;cursor:pointer;transition:.15s}',
-    '#ss-now .nx:hover{background:rgba(255,255,255,.2)}'
+    '#ss-now .nx:hover{background:rgba(255,255,255,.2)}',
+    '#ss-now .nseek{height:36px;padding:0 10px;border:none;border-radius:8px;background:rgba(255,255,255,.08);color:#fff;font:600 12px/1 inherit;cursor:pointer}',
+    '#ss-now .nseek:hover{background:rgba(255,255,255,.16)}',
+    '#ss-presets{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 6px}',
+    '#ss-presets button{background:#141416;color:#c8c8cc;border:1px solid #2a2a2e;border-radius:6px;padding:6px 9px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer}',
+    '#ss-presets button:hover{border-color:#45454c;color:#fff}',
+    '#ss-presets button.on{border-color:var(--ss-accent);color:#fff}',
+    '#ss-theme-hint{font-size:11.5px;color:#7a7a80;line-height:1.4;margin:0 0 4px;min-height:16px}',
+    '.ss-wide{width:100%;margin-top:10px;background:#161618;color:#dedee2;border:1px solid #2a2a30;border-radius:8px;padding:8px 10px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer}',
+    '.ss-wide:hover{border-color:var(--ss-accent);color:#fff}',
+    '.ss-linkrow{display:flex;gap:8px;margin-top:10px}',
+    '.ss-linkrow .ss-mini{flex:1;text-align:center}',
+    '#ss-history{display:flex;flex-direction:column;gap:2px;margin-top:8px}',
+    '.ss-hist{display:flex;gap:8px;align-items:center;width:100%;text-align:left;background:transparent;border:none;border-radius:6px;padding:5px 4px;cursor:pointer;color:inherit;font-family:inherit}',
+    '.ss-hist:hover{background:#1a1a1d}',
+    '.ss-hist .th{width:32px;height:32px;border-radius:4px;background:#1c1c1f center/cover no-repeat;flex:0 0 auto}',
+    '.ss-hist .meta{min-width:0;flex:1}',
+    '.ss-hist .tt{font-size:12.5px;font-weight:600;color:#eee;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+    '.ss-hist .aa{font-size:11px;color:#8a8a90;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
   ].join('');
 
   function injectCss() {
@@ -421,6 +500,105 @@
     ].join('');
   }
 
+  var PAGE_THEMES = [
+    { id: '', name: 'None', hint: 'SoundCloud as it is, plus the toggles below.' },
+    {
+      id: 'glass', name: 'Glass',
+      hint: 'Clears the top bar and the player. Shade is how much dark you keep.',
+      patch: { clearHeader: true, clearBar: true, headerAlpha: 16, barAlpha: 38, barBlur: true },
+      css: '.soundList__item,.trackItem,.lazyLoadingList__item{background-color:transparent!important}.soundList__item:hover,.trackItem:hover{background-color:rgba(255,255,255,.04)!important}'
+    },
+    {
+      id: 'ink', name: 'Ink',
+      hint: 'Near-black page, hairline edges, no glow.',
+      patch: { clearHeader: false, clearBar: false, themeSC: false },
+      css: [
+        'html,body,#app,#content,.l-container,.l-main,.l-fixed-content{background:#101010!important;background-color:#101010!important}',
+        '.header,.header__middle,.header__right,.header__left{background:#101010!important;border:none!important;box-shadow:inset 0 -1px 0 #262626!important}',
+        '.playControls,.playControls__inner,.playControls__bg{background:#0e0e0e!important;border:none!important;box-shadow:inset 0 1px 0 #262626!important}',
+        '.sidebarModule,.soundBadge,.commentForm,.modal__modal,.g-modal-dialog,.queue,.dropdownMenu{background:#161616!important;border-color:#2a2a2a!important}',
+        '.soundList__item:hover,.trackItem:hover{background:rgba(255,255,255,.04)!important}'
+      ].join('')
+    },
+    {
+      id: 'oled', name: 'OLED',
+      hint: 'True black. Best on an OLED screen.',
+      patch: { clearHeader: false, clearBar: false, themeSC: false },
+      css: [
+        'html,body,#app,#content,.l-container,.l-main,.header,.header__middle,.header__left,.header__right,.playControls,.playControls__inner,.playControls__bg,.sidebarModule,.modal__modal{background:#000!important;background-color:#000!important}',
+        '.header{box-shadow:inset 0 -1px 0 #1a1a1a!important;border:none!important}',
+        '.playControls{box-shadow:inset 0 1px 0 #1a1a1a!important;border:none!important}',
+        '.soundList__item:hover,.trackItem:hover{background:#0a0a0a!important}'
+      ].join('')
+    },
+    {
+      id: 'compact', name: 'Compact',
+      hint: 'Shorter rows. Does not touch the bars.',
+      css: [
+        '.sound__body{padding-top:6px!important;padding-bottom:6px!important}',
+        '.soundTitle__title,.trackItem__trackTitle{font-size:13px!important;line-height:1.25!important}',
+        '.soundTitle__username,.soundTitle__secondary{font-size:12px!important}',
+        '.sc-ministats,.sound__soundStats{font-size:11px!important}'
+      ].join('')
+    },
+    {
+      id: 'focus', name: 'Focus',
+      hint: 'Hides the right rail, banners and the legal footer.',
+      patch: { hideSidebar: true, hideUpsell: true, hideFooter: true },
+      css: '.l-content,.l-center{max-width:920px!important;margin-left:auto!important;margin-right:auto!important}'
+    },
+    {
+      id: 'soft', name: 'Soft',
+      hint: 'Flatter grays, no drop shadow on the bars.',
+      patch: { clearHeader: false, clearBar: false, themeSC: false },
+      css: [
+        'html,body,#app,#content,.l-container{background:#141414!important}',
+        '.header,.header__middle,.header__left,.header__right{background:#171717!important;box-shadow:none!important;border:none!important}',
+        '.playControls,.playControls__inner,.playControls__bg{background:#171717!important;box-shadow:none!important;border:none!important}'
+      ].join('')
+    },
+    {
+      id: 'quiet', name: 'Quiet',
+      hint: 'Less chrome around each track: no context line, dimmer counts.',
+      css: [
+        '.playbackSoundBadge__titleContext,.soundTitle__additional{display:none!important}',
+        '.sc-ministats,.sound__soundStats{opacity:.72!important}'
+      ].join('')
+    }
+  ];
+
+  function num(v, d) { return (typeof v === 'number' && isFinite(v)) ? v : d; }
+  function findTheme(id) {
+    for (var i = 0; i < PAGE_THEMES.length; i++) if (PAGE_THEMES[i].id === (id || '')) return PAGE_THEMES[i];
+    return PAGE_THEMES[0];
+  }
+  function chromeCss() {
+    var css = '';
+    var blurOn = !!config.barBlur;
+    var blur = blurOn
+      ? 'backdrop-filter:saturate(1.15) blur(12px);-webkit-backdrop-filter:saturate(1.15) blur(12px);'
+      : 'backdrop-filter:none;-webkit-backdrop-filter:none;';
+    if (config.clearHeader) {
+      var ha = Math.max(0, Math.min(85, num(config.headerAlpha, 0))) / 100;
+      var hbg = ha < 0.012 ? 'transparent' : ('rgba(16,16,18,' + ha.toFixed(3) + ')');
+      css += '.header,.header__middle,.header__right,.header__left,.header__inner,.header__content,.l-fixed-top,.header__overflowMenu{background:' + hbg + '!important;background-color:' + hbg + '!important;background-image:none!important;border-color:transparent!important;box-shadow:none!important}';
+      css += '.header{' + (ha < 0.9 ? blur : '') + '}';
+      css += '.header__logo,.header__nav,.headerMenu__link,.header a,.header button{position:relative;z-index:2}';
+    }
+    if (config.clearBar) {
+      var ba = Math.max(0, Math.min(90, num(config.barAlpha, 0))) / 100;
+      var bbg = ba < 0.012 ? 'transparent' : ('rgba(14,14,16,' + ba.toFixed(3) + ')');
+      var edge = (ba > 0.05 && ba < 0.8) ? 'box-shadow:inset 0 1px 0 rgba(255,255,255,.08)!important;' : 'box-shadow:none!important;';
+      css += '.playControls,.playControls__bg,.playControls__inner,.playControls__wrapper{background:' + bbg + '!important;background-color:' + bbg + '!important;background-image:none!important;border:none!important;' + edge + '}';
+      css += '.playControls{' + (ba < 0.9 ? blur : '') + '}';
+      css += '.playControls:before,.playControls:after,.playControls__bg:before,.playControls__bg:after{background:transparent!important;background-image:none!important;box-shadow:none!important}';
+      if (ba < 0.55) {
+        css += '.playControls .playbackSoundBadge__titleLink,.playControls .playbackSoundBadge__lightLink,.playControls .playbackTimeline__timePassed,.playControls .playbackTimeline__duration,.playControls .playbackTimeline__duration span{text-shadow:0 1px 2px rgba(0,0,0,.75)}';
+      }
+    }
+    return css;
+  }
+
   var pageStyle = null;
   function applyPageStyles() {
     if (!pageStyle) {
@@ -429,7 +607,9 @@
     }
     var css = '@keyframes ssRBpage{0%{background-position:0 0}100%{background-position:300% 0}}';
     if (config.themeSC) css += scThemeCss();
-    if (config.clearHeader) css += '.header,.header__middle,.header__right,.header__left,.l-fixed-top,.header__overflowMenu{background:transparent!important;background-color:transparent!important;border:none!important;box-shadow:none!important}.header__logo,.header__nav,.headerMenu__link,.header a,.header button{position:relative;z-index:2}';
+    var theme = findTheme(config.pageTheme);
+    if (theme && theme.css) css += theme.css;
+    css += chromeCss();
     if (config.hideFooter) css += '.footer,.l-footer,.commercialContainer,.mobileApps,.appLinks,.sidebarModule.mobileApps,#app footer,.l-fixed-content>footer{display:none!important}';
     if (config.hideUpsell) css += '.upsellBanner,.upsell,[class*="upsell"],.header__upsell,.frame-promo,.l-banner,.announcement,.playControls__goPlus,.systemPlaylistBannerItem{display:none!important}';
     if (config.hideSidebar) css += '.l-listen-rail,.stream__suggestions,.l-sidebar-right,.l-listen .l-right{display:none!important}';
@@ -559,7 +739,8 @@
   function rangeRow(label, key, mn, mx, st, fmt, onApply) {
     var row = el('div', { class: 'ss-vrow' });
     row.appendChild(el('div', { class: 'ss-vlbl' }, label));
-    var inp = el('input', { type: 'range', min: String(mn), max: String(mx), step: String(st) });
+    var inp = el('input', { type: 'range', id: 'ss-r-' + key, min: String(mn), max: String(mx), step: String(st) });
+    inp._fmt = fmt;
     inp.value = config[key];
     var val = el('div', { class: 'ss-vval' }, fmt(config[key]));
     inp.addEventListener('input', function () {
@@ -655,6 +836,146 @@
     applyPageStyles();
   }
 
+  function syncToggle(key) {
+    var sw = document.getElementById('sw-' + key);
+    if (sw) sw.checked = !!config[key];
+  }
+  function syncRange(key) {
+    var inp = document.getElementById('ss-r-' + key);
+    if (!inp) return;
+    inp.value = config[key];
+    var val = inp.parentNode && inp.parentNode.querySelector('.ss-vval');
+    if (val && inp._fmt) val.textContent = inp._fmt(config[key]);
+    sliderFill(inp);
+  }
+  function markThemes() {
+    var box = document.getElementById('ss-presets');
+    if (!box) return;
+    var id = config.pageTheme || '';
+    Array.prototype.forEach.call(box.querySelectorAll('button'), function (b) {
+      b.classList.toggle('on', (b.getAttribute('data-theme') || '') === id);
+    });
+    var hint = document.getElementById('ss-theme-hint');
+    if (hint) hint.textContent = findTheme(id).hint || '';
+  }
+  function applyPageTheme(id) {
+    var t = findTheme(id);
+    var patch = { pageTheme: t.id };
+    if (t.patch) {
+      for (var k in t.patch) {
+        if (Object.prototype.hasOwnProperty.call(t.patch, k)) patch[k] = t.patch[k];
+      }
+    }
+    save(patch);
+    ['clearHeader', 'clearBar', 'barBlur', 'themeSC', 'hideSidebar', 'hideUpsell', 'hideFooter'].forEach(syncToggle);
+    ['headerAlpha', 'barAlpha'].forEach(syncRange);
+    applyPageStyles();
+    markThemes();
+  }
+  function shadeChanged(toggleKey) {
+    return function () {
+      if (!config[toggleKey]) {
+        config[toggleKey] = true;
+        syncToggle(toggleKey);
+        var p = {}; p[toggleKey] = true; save(p);
+      }
+      applyPageStyles();
+    };
+  }
+  function readTransport() {
+    var b = document.querySelector('.playControls__play') || document.querySelector('.playControl');
+    if (!b) return null;
+    if (b.classList.contains('playing')) return true;
+    var label = ((b.getAttribute('title') || '') + ' ' + (b.getAttribute('aria-label') || '')).toLowerCase();
+    if (label.indexOf('pause') !== -1) return true;
+    if (label.indexOf('play') !== -1) return false;
+    return null;
+  }
+  function seekBy(delta) {
+    var list = [].slice.call(document.getElementsByTagName('audio')).concat(mediaEls);
+    var touched = false;
+    for (var i = 0; i < list.length; i++) {
+      var m = list[i];
+      if (!m || !isFinite(m.currentTime)) continue;
+      try {
+        var dur = (isFinite(m.duration) && m.duration > 0) ? m.duration : 1e9;
+        var next = Math.max(0, Math.min(dur - 0.25, m.currentTime + delta));
+        if (Math.abs(next - m.currentTime) < 0.05) continue;
+        m.currentTime = next;
+        touched = true;
+      } catch (e) {}
+    }
+    return touched;
+  }
+  function copyText(text) {
+    if (!text) return;
+    function done(ok) {
+      var b = document.getElementById('ss-copy-link');
+      if (!b) return;
+      b.textContent = ok ? 'Copied' : 'Copy failed';
+      setTimeout(function () { if (b) b.textContent = 'Copy link'; }, 1200);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
+      return;
+    }
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.left = '-999px';
+      document.body.appendChild(ta); ta.select();
+      done(document.execCommand('copy'));
+      ta.remove();
+    } catch (e) { done(false); }
+  }
+  var histKey = '';
+  function pushHistory(data) {
+    if (!data || !data.title) return;
+    var key = (data.url || '') + '|' + data.title;
+    var list = config.history || [];
+    if (key === histKey) {
+      if (data.artwork && list[0] && !list[0].artwork && ((list[0].url || '') + '|' + list[0].title) === key) {
+        list[0].artwork = data.artwork;
+        save({ history: list });
+        renderHistory();
+      }
+      return;
+    }
+    histKey = key;
+    if (list.length && ((list[0].url || '') + '|' + list[0].title) === key) return;
+    list.unshift({ title: data.title, artist: data.artist || '', artwork: data.artwork || '', url: data.url || '' });
+    if (list.length > 12) list.length = 12;
+    config.history = list;
+    save({ history: list });
+    renderHistory();
+  }
+  function renderHistory() {
+    var box = document.getElementById('ss-history');
+    if (!box) return;
+    box.innerHTML = '';
+    var list = config.history || [];
+    if (!list.length) {
+      box.appendChild(el('div', { class: 'ss-decor-empty' }, 'Played tracks land here.'));
+      return;
+    }
+    list.forEach(function (h) {
+      var row = el('button', { class: 'ss-hist', type: 'button' });
+      var th = el('div', { class: 'th' });
+      if (h.artwork) th.style.backgroundImage = 'url("' + String(h.artwork).replace(/"/g, '') + '")';
+      var meta = el('div', { class: 'meta' });
+      var tt = el('div', { class: 'tt' }); tt.textContent = h.title || '';
+      var aa = el('div', { class: 'aa' }); aa.textContent = h.artist || '';
+      meta.appendChild(tt); meta.appendChild(aa);
+      row.appendChild(th); row.appendChild(meta);
+      row.addEventListener('click', function () { if (h.url) window.location.href = h.url; });
+      box.appendChild(row);
+    });
+  }
+  function typingTarget(e) {
+    var t = e.target;
+    if (!t) return false;
+    var tag = (t.tagName || '').toLowerCase();
+    return tag === 'input' || tag === 'textarea' || tag === 'select' || t.isContentEditable;
+  }
   function ssClick(sel) { var e = document.querySelector(sel); if (e) { e.click(); return true; } return false; }
   window.__ssControl = function (action) {
     try {
@@ -745,20 +1066,24 @@
     var t = el('div', { class: 'nt' }, 'Nothing playing'), a = el('div', { class: 'na' }, '');
     nowVizCanvas = el('canvas', { id: 'ss-now-viz' });
     var ctl = el('div', { class: 'nctl' });
+    var bback = el('button', { class: 'nseek', type: 'button', title: 'Back 10 seconds' }, '−10');
     var bprev = el('button', { class: 'nbtn', title: 'Previous' }, nowIcon('<path d="M7 6h2v12H7zM20 6v12l-9-6z"/>'));
     var bplay = el('button', { class: 'nbtn big', title: 'Play / Pause' }, nowIcon('<path d="M8 5v14l11-7z"/>'));
     var bnext = el('button', { class: 'nbtn', title: 'Next' }, nowIcon('<path d="M15 6h2v12h-2zM4 6l9 6-9 6z"/>'));
+    var bfwd = el('button', { class: 'nseek', type: 'button', title: 'Forward 10 seconds' }, '+10');
+    bback.addEventListener('click', function () { seekBy(-10); });
     bprev.addEventListener('click', function () { window.__ssControl('prev'); });
     bplay.addEventListener('click', function () { window.__ssControl('playpause'); });
     bnext.addEventListener('click', function () { window.__ssControl('next'); });
-    ctl.appendChild(bprev); ctl.appendChild(bplay); ctl.appendChild(bnext);
+    bfwd.addEventListener('click', function () { seekBy(10); });
+    ctl.appendChild(bback); ctl.appendChild(bprev); ctl.appendChild(bplay); ctl.appendChild(bnext); ctl.appendChild(bfwd);
     var lyrBox = el('div', { class: 'nlyr empty' }), lns = el('div', { class: 'lns' });
     lyrBox.appendChild(lns);
     side.appendChild(t); side.appendChild(a); side.appendChild(nowVizCanvas); side.appendChild(ctl); side.appendChild(lyrBox);
     wrap.appendChild(art); wrap.appendChild(side);
     root.appendChild(bg); root.appendChild(sh); root.appendChild(xb); root.appendChild(wrap);
     document.body.appendChild(root);
-    nowUI = { root: root, bg: bg, art: art, t: t, a: a, lyrBox: lyrBox, lns: lns, cur: null };
+    nowUI = { root: root, bg: bg, art: art, t: t, a: a, lyrBox: lyrBox, lns: lns, cur: null, play: bplay };
     renderLyrics();
   }
   function updateNow() {
@@ -770,6 +1095,13 @@
       var art = d.artwork || '';
       if (nowUI.cur !== art) { nowUI.cur = art; nowUI.art.style.backgroundImage = art ? 'url("' + art + '")' : ''; nowUI.bg.style.backgroundImage = art ? 'url("' + art + '")' : ''; }
     } else { nowUI.t.textContent = 'Nothing playing'; nowUI.a.textContent = ''; }
+    if (nowUI.play) {
+      var on = readTransport() === true;
+      if (nowUI.playMode !== on) {
+        nowUI.playMode = on;
+        nowUI.play.innerHTML = on ? nowIcon('<path d="M7 5h4v14H7zM13 5h4v14h-4z"/>') : nowIcon('<path d="M8 5v14l11-7z"/>');
+      }
+    }
     highlightLyrics(curNow);
   }
   function openNow() {
@@ -843,7 +1175,21 @@
     dsc.appendChild(buildPreview());
     pgDiscord.appendChild(dsc);
 
-    var aps = section('Appearance');
+    var aps = section('Page');
+    var presets = el('div', { id: 'ss-presets' });
+    PAGE_THEMES.forEach(function (t) {
+      var b = el('button', { type: 'button' }, t.name);
+      b.setAttribute('data-theme', t.id);
+      b.addEventListener('click', function () { applyPageTheme(t.id); });
+      presets.appendChild(b);
+    });
+    aps.appendChild(presets);
+    aps.appendChild(el('div', { id: 'ss-theme-hint' }, ''));
+    aps.appendChild(toggleRow('See-through header', 'Clear the top bar. Buttons stay put.', 'clearHeader', function () { applyPageStyles(); }));
+    aps.appendChild(rangeRow('Top shade', 'headerAlpha', 0, 80, 2, function (v) { return Math.round(v) + '%'; }, shadeChanged('clearHeader')));
+    aps.appendChild(toggleRow('See-through player', 'The bottom bar, same idea. 0% shade is fully clear.', 'clearBar', function () { applyPageStyles(); }));
+    aps.appendChild(rangeRow('Bar shade', 'barAlpha', 0, 85, 2, function (v) { return Math.round(v) + '%'; }, shadeChanged('clearBar')));
+    aps.appendChild(toggleRow('Blur', 'Softens whatever sits behind a clear bar', 'barBlur', function () { applyPageStyles(); }));
     swatchWrap = el('div', { id: 'ss-themes' });
     THEMES.forEach(function (t) {
       var c = el('div', { class: 'sw-c', title: t.n });
@@ -856,19 +1202,49 @@
     try { picker.value = config.accent; } catch (e) { picker.value = '#ff5500'; }
     picker.addEventListener('input', function () { config.accent = picker.value; save({ accent: picker.value }); applyAccent(); });
     pick.appendChild(picker); swatchWrap.appendChild(pick);
+    aps.appendChild(el('div', { class: 'ss-l', style: 'margin:16px 0 8px' }, 'Accent'));
     aps.appendChild(swatchWrap);
-    aps.appendChild(toggleRow('Theme SoundCloud', 'Recolor the whole page in your accent color', 'themeSC', function () { applyPageStyles(); }));
-    aps.appendChild(toggleRow('Rainbow music bar', 'Animated rainbow seek bar (here & in SoundCloud)', 'rainbowBar', function () { applyRainbow(); }));
+    aps.appendChild(toggleRow('Theme SoundCloud', 'Recolor the page with the accent. Bars follow the toggles above.', 'themeSC', function () { applyPageStyles(); }));
+    aps.appendChild(toggleRow('Rainbow music bar', 'Animated rainbow seek bar', 'rainbowBar', function () { applyRainbow(); }));
     var curRow = el('div', { class: 'ss-row' });
     curRow.appendChild(el('div', { class: 'ss-l' }, 'Cursor'));
     var curSel = el('select');
     CURSORS.forEach(function (n) { var o = el('option', { value: n }, n); if (n === config.cursor) o.selected = true; curSel.appendChild(o); });
     curSel.addEventListener('change', function () { config.cursor = curSel.value; save({ cursor: curSel.value }); applyPageStyles(); });
     curRow.appendChild(curSel); aps.appendChild(curRow);
-    aps.appendChild(toggleRow('See-through header', 'Clear the top bar so photos show behind it (buttons stay)', 'clearHeader', function () { applyPageStyles(); }));
-    aps.appendChild(toggleRow('Hide footer', 'Hide the GO MOBILE / legal footer', 'hideFooter', function () { applyPageStyles(); }));
-    aps.appendChild(toggleRow('Hide banners', 'Hide upgrade and promo banners', 'hideUpsell', function () { applyPageStyles(); }));
-    aps.appendChild(toggleRow('Hide right sidebar', 'Hide the suggestions rail on Home', 'hideSidebar', function () { applyPageStyles(); }));
+    aps.appendChild(toggleRow('Hide footer', 'The GO MOBILE / legal block, not the player', 'hideFooter', function () { applyPageStyles(); }));
+    aps.appendChild(toggleRow('Hide banners', 'Upgrade and promo strips', 'hideUpsell', function () { applyPageStyles(); }));
+    aps.appendChild(toggleRow('Hide right sidebar', 'Suggestions rail on Home', 'hideSidebar', function () { applyPageStyles(); }));
+    var resetLook = el('button', { class: 'ss-wide', type: 'button' }, 'Reset page look');
+    resetLook.addEventListener('click', function () {
+      applyPageTheme('');
+      config.customCss = '';
+      config.cursor = 'Default';
+      config.rainbowBar = false;
+      config.clearHeader = true;
+      config.clearBar = true;
+      config.headerAlpha = 0;
+      config.barAlpha = 0;
+      config.barBlur = false;
+      config.hideFooter = false;
+      config.hideUpsell = false;
+      config.hideSidebar = false;
+      config.themeSC = false;
+      save({
+        customCss: '', cursor: 'Default', rainbowBar: false,
+        clearHeader: true, clearBar: true, headerAlpha: 0, barAlpha: 0, barBlur: false,
+        hideFooter: false, hideUpsell: false, hideSidebar: false, themeSC: false, pageTheme: ''
+      });
+      var cssBox = document.getElementById('ss-css');
+      if (cssBox) cssBox.value = '';
+      if (curSel) curSel.value = 'Default';
+      ['clearHeader', 'clearBar', 'barBlur', 'themeSC', 'hideSidebar', 'hideUpsell', 'hideFooter', 'rainbowBar'].forEach(syncToggle);
+      ['headerAlpha', 'barAlpha'].forEach(syncRange);
+      applyRainbow();
+      applyPageStyles();
+      markThemes();
+    });
+    aps.appendChild(resetLook);
     pgLook.appendChild(aps);
 
     var dec = section('Decorations');
@@ -932,9 +1308,38 @@
 
     var fxs = section('Effects');
     fxs.appendChild(toggleRow('8D audio', 'The sound slowly rotates around your head', 'fx8d', function () { applyFx8d(); }));
+    fxs.appendChild(toggleRow('Mono', 'Both channels in the center', 'mono', function () { applyMono(); }));
+    fxs.appendChild(toggleRow('Leveler', 'Pulls loud and quiet parts closer. The limiter still stops clipping.', 'leveler', function () { applyLeveler(); }));
     fxs.appendChild(rangeRow('Reverb', 'fxReverb', 0, 100, 5, function (v) { return Math.round(v) + '%'; }, applyReverb));
     fxs.appendChild(rangeRow('Speed', 'speed', 50, 150, 1, function (v) { return (v / 100).toFixed(2) + 'x'; }, applySpeed));
-    fxs.appendChild(el('div', { class: 'ss-d', style: 'margin-top:9px;line-height:1.45' }, 'Speed above 1.00x gives a nightcore feel, below is slowed; the pitch follows the speed.'));
+    fxs.appendChild(el('div', { class: 'ss-d', style: 'margin-top:9px;line-height:1.45' }, 'Above 1.00x the pitch goes up with the speed. Below 1.00x it drops.'));
+    var resetAudio = el('button', { class: 'ss-wide', type: 'button' }, 'Reset sound');
+    resetAudio.addEventListener('click', function () {
+      config.eqEnabled = false;
+      config.eqPreset = 'Flat';
+      config.eqGains = DEFAULTS.eqGains.slice();
+      config.volumeBoost = 0;
+      config.bassBoost = 0;
+      config.fx8d = false;
+      config.fxReverb = 0;
+      config.speed = 100;
+      config.mono = false;
+      config.leveler = false;
+      save({
+        eqEnabled: false, eqPreset: 'Flat', eqGains: config.eqGains,
+        volumeBoost: 0, bassBoost: 0, fx8d: false, fxReverb: 0, speed: 100, mono: false, leveler: false
+      });
+      ['eqEnabled', 'fx8d', 'mono', 'leveler'].forEach(syncToggle);
+      ['fxReverb', 'speed'].forEach(syncRange);
+      if (presetSel) presetSel.value = 'Flat';
+      if (boostInpRef) { boostInpRef.value = 0; sliderFill(boostInpRef); }
+      if (bassInpRef) { bassInpRef.value = 0; sliderFill(bassInpRef); }
+      if (boostVal) boostVal.textContent = '+0 dB';
+      var bb = document.querySelector('#ss-bass-row .ss-bass-val');
+      if (bb) bb.textContent = '+0 dB';
+      applyEq(); applyBoost(); applyBass(); applyFx8d(); applyReverb(); applySpeed(); applyMono(); applyLeveler(); drawEq();
+    });
+    fxs.appendChild(resetAudio);
     pgAudio.appendChild(fxs);
 
     var viz = section('Visualizer');
@@ -996,18 +1401,51 @@
     var nowBtn = el('button', { id: 'ss-nowbtn' }, 'Open fullscreen player');
     nowBtn.addEventListener('click', function () { closePanel(); openNow(); });
     now.appendChild(nowBtn);
-    now.appendChild(el('div', { class: 'ss-d', style: 'margin-top:8px;line-height:1.45' }, 'Press F2 anytime to open or close the fullscreen player.'));
+    var linkRow = el('div', { class: 'ss-linkrow' });
+    var copyBtn = el('button', { class: 'ss-mini', id: 'ss-copy-link', type: 'button' }, 'Copy link');
+    copyBtn.addEventListener('click', function () { copyText(preview && preview.url); });
+    var openBtn = el('button', { class: 'ss-mini', type: 'button' }, 'Open in browser');
+    openBtn.addEventListener('click', function () { if (preview && preview.url) Bridge.openExternal(preview.url); });
+    linkRow.appendChild(copyBtn); linkRow.appendChild(openBtn);
+    now.appendChild(linkRow);
+    now.appendChild(el('div', { class: 'ss-d', style: 'margin-top:8px;line-height:1.45' }, 'F2 opens the big player. Left and right arrows seek 10 seconds while it is open.'));
+    now.appendChild(el('div', { class: 'ss-l', style: 'margin:16px 0 4px' }, 'Recent'));
+    now.appendChild(el('div', { id: 'ss-history' }));
     pgNow.appendChild(now);
 
     var adv = section('General');
     adv.appendChild(toggleRow('Minimize to tray', 'Closing the window hides it to the tray', 'minimizeToTray'));
+    adv.appendChild(toggleRow('Always on top', 'Keep this window above other apps', 'alwaysOnTop'));
     adv.appendChild(toggleRow('Media hotkeys', 'Media keys control playback even when unfocused', 'globalHotkeys'));
-    adv.appendChild(toggleRow('Ad blocker', 'Applies after restart', 'adBlock'));
+    adv.appendChild(toggleRow('Ad blocker', 'Takes effect immediately', 'adBlock'));
+    adv.appendChild(rangeRow('Zoom', 'zoom', 80, 140, 5, function (v) { return Math.round(v) + '%'; }));
+    var startRow = el('div', { class: 'ss-row' });
+    startRow.appendChild(el('div', { class: 'ss-l' }, 'Open on'));
+    var startSel = el('select');
+    [['discover', 'Discover'], ['stream', 'Stream'], ['likes', 'Likes'], ['library', 'Library'], ['history', 'History']].forEach(function (o) {
+      var op = el('option', { value: o[0] }, o[1]);
+      if ((config.startPage || 'discover') === o[0]) op.selected = true;
+      startSel.appendChild(op);
+    });
+    startSel.addEventListener('change', function () { config.startPage = startSel.value; save({ startPage: startSel.value }); });
+    startRow.appendChild(startSel);
+    adv.appendChild(startRow);
+    adv.appendChild(el('div', { class: 'ss-d', style: 'margin-top:-2px' }, 'Used the next time the app starts. Window size is remembered too.'));
+    var goBtn = el('button', { class: 'ss-wide', type: 'button' }, 'Go there now');
+    goBtn.addEventListener('click', function () {
+      var map = { discover: '/discover', stream: '/feed', likes: '/you/likes', library: '/you/library', history: '/you/history' };
+      window.location.href = 'https://soundcloud.com' + (map[config.startPage] || '/discover');
+    });
+    adv.appendChild(goBtn);
+    var reloadBtn = el('button', { class: 'ss-wide', type: 'button' }, 'Reload SoundCloud');
+    reloadBtn.addEventListener('click', function () { location.reload(); });
+    adv.appendChild(reloadBtn);
 
     var cssBox = el('textarea', { id: 'ss-css', spellcheck: 'false', placeholder: '/* custom CSS for SoundCloud */' });
     cssBox.value = config.customCss || '';
 
-    adv.appendChild(el('div', { class: 'ss-l', style: 'margin:14px 0 7px' }, 'Saved themes'));
+    adv.appendChild(el('div', { class: 'ss-d', style: 'margin:14px 0 8px;line-height:1.4' }, 'Your CSS is applied after the page theme, so it wins.'));
+    adv.appendChild(el('div', { class: 'ss-l', style: 'margin:0 0 7px' }, 'Saved CSS'));
     var thRow = el('div', { id: 'ss-theme-row' });
     var themeSel = el('select');
     function refreshThemeSel() {
@@ -1047,6 +1485,8 @@
     applyAccent(); applyRainbow();
     drawEq(); sliderFill(boostInpRef); sliderFill(bassInpRef);
     buildDecorList(); renderDecor();
+    markThemes();
+    renderHistory();
   }
 
   function buildPreview() {
@@ -1060,7 +1500,7 @@
     meta.appendChild(t); meta.appendChild(a); meta.appendChild(bar); meta.appendChild(tm);
     bd.appendChild(art); bd.appendChild(meta); pv.appendChild(bd);
     var btn = el('button', { class: 'btn' }, 'Listen on SoundCloud');
-    btn.addEventListener('click', function () { Bridge.openExternal('https://github.com/MyxaCode/soundcloud'); });
+    btn.addEventListener('click', function () { if (preview.url) Bridge.openExternal(preview.url); });
     pv.appendChild(btn);
     preview = { art: art, t: t, a: a, bar: i, t1: t1, t2: t2, url: null };
     return pv;
@@ -1327,6 +1767,10 @@
     if (e.key === 'F1') { e.preventDefault(); e.stopPropagation(); togglePanel(); }
     else if (e.key === 'F2') { e.preventDefault(); e.stopPropagation(); toggleNow(); }
     else if (e.key === 'Escape') { if (nowOpen) { e.preventDefault(); closeNow(); } else if (panelOpen) closePanel(); }
+    else if (!typingTarget(e) && nowOpen && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+      e.preventDefault();
+      seekBy(e.key === 'ArrowLeft' ? -10 : 10);
+    }
   }, true);
 
   function abs(u) { return !u ? null : (u.indexOf('http') === 0 ? u : 'https://soundcloud.com' + u); }
@@ -1346,7 +1790,9 @@
       var url = abs(titleEl.getAttribute('href')), now, max;
       var wrap = document.querySelector('.playbackTimeline__progressWrapper');
       if (wrap) { now = parseFloat(wrap.getAttribute('aria-valuenow')); max = parseFloat(wrap.getAttribute('aria-valuemax')); }
-      updatePreview({ title: title, artist: artist, artwork: artwork, url: url }, now, max);
+      var track = { title: title, artist: artist, artwork: artwork, url: url };
+      updatePreview(track, now, max);
+      pushHistory(track);
     } catch (e) {}
   }
   function updatePreview(data, now, max) {

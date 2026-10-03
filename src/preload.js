@@ -51,14 +51,29 @@ function scrape() {
     const wrap = document.querySelector('.playbackTimeline__progressWrapper');
     if (wrap) { nowVal = parseFloat(wrap.getAttribute('aria-valuenow')); maxVal = parseFloat(wrap.getAttribute('aria-valuemax')); }
 
+    const playBtn = document.querySelector('.playControls__play') || document.querySelector('.playControl');
+    let playing = null;
+    if (playBtn) {
+      if (playBtn.classList.contains('playing')) playing = true;
+      else {
+        const label = ((playBtn.getAttribute('title') || '') + ' ' + (playBtn.getAttribute('aria-label') || '')).toLowerCase();
+        if (label.indexOf('pause') !== -1) playing = true;
+        else if (label.indexOf('play') !== -1) playing = false;
+      }
+    }
     const trackId = url || title;
     const sameTrack = (trackId === lastTrackId);
-    let playing;
-    if (sameTrack && lastNow != null && !isNaN(nowVal) && nowVal > lastNow + 0.2) playing = true;
-    else if (sameTrack && lastNow != null && !isNaN(nowVal) && Math.abs(nowVal - lastNow) < 0.05) playing = false;
-    else playing = true;
+    if (playing == null) {
+      if (sameTrack && lastNow != null && !isNaN(nowVal) && nowVal > lastNow + 0.2) playing = true;
+      else if (sameTrack && lastNow != null && !isNaN(nowVal) && Math.abs(nowVal - lastNow) < 0.05) playing = false;
+      else playing = true;
+    }
     if (!isNaN(nowVal)) lastNow = nowVal;
     lastTrackId = trackId;
+
+    const likeBtn = document.querySelector('.playbackSoundBadge .sc-button-like')
+      || document.querySelector('.playControls__soundBadge .sc-button-like');
+    const liked = !!(likeBtn && likeBtn.classList.contains('sc-button-selected'));
 
     let startTimestamp = 0, endTimestamp = 0;
     if (!isNaN(nowVal) && !isNaN(maxVal) && maxVal > 0) {
@@ -73,10 +88,17 @@ function scrape() {
       artwork: artwork ? String(artwork) : null,
       url: url ? String(url) : null,
       startTimestamp: startTimestamp,
-      endTimestamp: endTimestamp
+      endTimestamp: endTimestamp,
+      liked: liked
     };
 
-    const key = JSON.stringify([data.playing, data.title, data.artist, data.url]);
+    ipcRenderer.send('now-tick', {
+      now: isNaN(nowVal) ? 0 : nowVal,
+      max: isNaN(maxVal) ? 0 : maxVal,
+      playing: !!playing
+    });
+
+    const key = JSON.stringify([data.playing, data.title, data.artist, data.url, data.artwork || '', data.liked]);
     if (key === lastKey) return;
     lastKey = key;
     ipcRenderer.send('now-playing', data);
