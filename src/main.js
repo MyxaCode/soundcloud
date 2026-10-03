@@ -1,8 +1,9 @@
-const { app, BrowserWindow, session, shell, ipcMain, nativeImage, Tray, Menu, dialog, globalShortcut, Notification } = require('electron');
+const { app, BrowserWindow, session, shell, ipcMain, nativeImage, Tray, Menu, dialog, globalShortcut, Notification, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
 const DiscordPresence = require('./discordPresence');
+const lyrics = require('./lyrics');
 const log = require('./log');
 
 const isDev = !app.isPackaged;
@@ -71,7 +72,9 @@ const DEFAULT_CONFIG = {
   winH: 820,
   winX: null,
   winY: null,
-  winMax: false
+  winMax: false,
+  miniX: null,
+  miniY: null
 };
 
 function configPath() {
@@ -297,15 +300,54 @@ function showTrackNotification(d) {
   if (d.artwork) httpGet(d.artwork, false, (err, buf) => make(!err && buf ? nativeImage.createFromBuffer(buf) : null));
   else make(null);
 }
+function httpGetTimed(url, ms, cb) {
+  let done = false;
+  const finish = (err, txt) => { if (done) return; done = true; cb(err, txt); };
+  const t = setTimeout(() => finish(new Error('timeout')), ms);
+  httpGet(url, true, (err, txt) => { clearTimeout(t); finish(err, txt); });
+}
 function fetchLyrics(d) {
-  const q = 'https://lrclib.net/api/get?artist_name=' + encodeURIComponent(d.artist || '') + '&track_name=' + encodeURIComponent(d.title || '');
-  httpGet(q, true, (err, txt) => {
-    const payload = { synced: null, plain: null, title: d.title || '' };
-    if (!err && txt) {
-      try { const j = JSON.parse(txt); payload.synced = j.syncedLyrics || null; payload.plain = j.plainLyrics || null; } catch (e) {}
+  const qs = lyrics.queries(d && d.artist, d && d.title);
+  const duration = Number(d && d.duration) || 0;
+  const payload = { synced: null, plain: null, title: (d && d.title) || '', source: '' };
+  if (!qs.length) { pageCall('__ssLyrics', payload); return; }
+  let step = 0;
+  const q0 = qs[0];
+  function done() { pageCall('__ssLyrics', payload); }
+  function accept(hit, source) {
+    if (!hit) return false;
+    payload.synced = hit.synced || null;
+    payload.plain = hit.plain || null;
+    payload.source = source;
+    return !!(payload.synced || payload.plain);
+  }
+  function next() {
+    if (step < qs.length) {
+      const q = qs[step++];
+      const url = 'https://lrclib.net/api/get?artist_name=' + encodeURIComponent(q.artist) + '&track_name=' + encodeURIComponent(q.title);
+      httpGetTimed(url, 5500, (err, txt) => {
+        if (accept(lyrics.parseLrclib(txt), 'LRCLIB')) return done();
+        next();
+      });
+      return;
     }
-    pageCall('__ssLyrics', payload);
-  });
+    const search = 'https://lrclib.net/api/search?track_name=' + encodeURIComponent(q0.title) + '&artist_name=' + encodeURIComponent(q0.artist);
+    httpGetTimed(search, 5500, (err, txt) => {
+      if (accept(lyrics.pickSearch(txt, duration), 'LRCLIB')) return done();
+      const q = encodeURIComponent((q0.artist ? q0.artist + ' ' : '') + q0.title);
+      httpGetTimed('https://api.textyl.co/api/lyrics?q=' + q, 5500, (err2, txt2) => {
+        const synced = lyrics.parseTextyl(txt2);
+        if (synced) { payload.synced = synced; payload.source = 'Textyl'; return done(); }
+        const ovh = 'https://api.lyrics.ovh/v1/' + encodeURIComponent(q0.artist || ' ') + '/' + encodeURIComponent(q0.title);
+        httpGetTimed(ovh, 5500, (err3, txt3) => {
+          const plain = lyrics.parseOvh(txt3);
+          if (plain) { payload.plain = plain; payload.source = 'lyrics.ovh'; }
+          done();
+        });
+      });
+    });
+  }
+  next();
 }
 function handleNowPlaying(d) {
   if (!d || !d.title) return;
@@ -453,14 +495,38 @@ function setupTray() {
   });
 }
 
+function miniOnScreen(x, y) {
+  try {
+    const displays = screen.getAllDisplays();
+    return displays.some(function (d) {
+      const a = d.workArea;
+      return x < a.x + a.width - 40 && x + 344 > a.x + 20 && y < a.y + a.height - 20 && y + 118 > a.y;
+    });
+  } catch (e) { return false; }
+}
+let miniDrag = null;
+function stopMiniDrag() {
+  if (!miniDrag) return;
+  clearInterval(miniDrag.timer);
+  miniDrag = null;
+  if (miniWindow && !miniWindow.isDestroyed()) {
+    const b = miniWindow.getBounds();
+    config.miniX = b.x;
+    config.miniY = b.y;
+    scheduleSave();
+  }
+}
 function createMiniWindow() {
   if (miniWindow) { miniWindow.show(); return; }
   let x, y;
   try {
-    const { screen } = require('electron');
     const wa = screen.getPrimaryDisplay().workArea;
     x = wa.x + wa.width - 360; y = wa.y + wa.height - 136;
   } catch (e) {}
+  if (Number.isFinite(config.miniX) && Number.isFinite(config.miniY) && miniOnScreen(config.miniX, config.miniY)) {
+    x = config.miniX;
+    y = config.miniY;
+  }
   miniWindow = new BrowserWindow({
     width: 344, height: 118, x: x, y: y,
     frame: false, resizable: false, alwaysOnTop: true, skipTaskbar: true,
@@ -478,7 +544,10 @@ function createMiniWindow() {
     if (config.miniPlayer) { config.miniPlayer = false; scheduleSave(); }
   });
 }
-function closeMiniWindow() { if (miniWindow) { miniWindow.destroy(); miniWindow = null; } }
+function closeMiniWindow() {
+  if (miniDrag) { clearInterval(miniDrag.timer); miniDrag = null; }
+  if (miniWindow) { miniWindow.destroy(); miniWindow = null; }
+}
 
 async function loadExtensions() {
   const dir = extensionsDir();
@@ -535,7 +604,29 @@ function registerIpc() {
   });
   ipcMain.on('ss-open-external', (_e, url) => { shell.openExternal(url).catch(() => {}); });
   ipcMain.on('ss-control', (_e, action) => pageControl(action));
-  ipcMain.on('mini-close', () => { config.miniPlayer = false; scheduleSave(); closeMiniWindow(); });
+  ipcMain.on('mini-close', () => { stopMiniDrag(); config.miniPlayer = false; scheduleSave(); closeMiniWindow(); });
+  ipcMain.on('mini-show-main', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  });
+  ipcMain.on('mini-drag-start', () => {
+    if (!miniWindow || miniWindow.isDestroyed()) return;
+    stopMiniDrag();
+    const cursor = screen.getCursorScreenPoint();
+    const b = miniWindow.getBounds();
+    const ox = cursor.x - b.x;
+    const oy = cursor.y - b.y;
+    miniDrag = {
+      timer: setInterval(() => {
+        if (!miniWindow || miniWindow.isDestroyed()) { stopMiniDrag(); return; }
+        const c = screen.getCursorScreenPoint();
+        miniWindow.setPosition(Math.round(c.x - ox), Math.round(c.y - oy));
+      }, 16)
+    };
+  });
+  ipcMain.on('mini-drag-end', () => stopMiniDrag());
   ipcMain.on('ss-log', (_e, msg) => log.w('[ui] ' + msg));
 
   ipcMain.handle('ss-pick-image', async () => {

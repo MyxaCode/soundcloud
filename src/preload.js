@@ -89,7 +89,8 @@ function scrape() {
       url: url ? String(url) : null,
       startTimestamp: startTimestamp,
       endTimestamp: endTimestamp,
-      liked: liked
+      liked: liked,
+      duration: (!isNaN(maxVal) && maxVal > 0) ? Math.round(maxVal) : 0
     };
 
     ipcRenderer.send('now-tick', {

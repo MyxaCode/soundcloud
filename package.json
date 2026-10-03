@@ -1,6 +1,6 @@
 {
   "name": "soundcloud-serverside",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "A dedicated Chromium browser for SoundCloud with Discord Rich Presence",
   "author": "ServerSide",
   "license": "MIT",

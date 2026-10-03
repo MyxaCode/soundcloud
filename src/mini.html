@@ -8,16 +8,17 @@
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
   .mini { width: 100%; height: 100%; background: #121214; border: 1px solid #242428;
     border-radius: 14px; display: flex; align-items: center; gap: 11px; padding: 12px 12px 18px;
-    -webkit-app-region: drag; box-shadow: 0 10px 28px rgba(0,0,0,.45); position: relative; }
+    box-shadow: 0 10px 28px rgba(0,0,0,.45); position: relative; }
+  .art, .info { cursor: grab; }
   .prog { position: absolute; left: 14px; right: 14px; bottom: 8px; height: 2px;
-    background: #2a2a2e; border-radius: 2px; overflow: hidden; -webkit-app-region: no-drag; }
+    background: #2a2a2e; border-radius: 2px; overflow: hidden; }
   .prog i { display: block; height: 100%; width: 0; background: #dedee2; }
   .art { width: 62px; height: 62px; border-radius: 10px; flex: 0 0 auto;
     background: #1f1f23 center/cover no-repeat; box-shadow: 0 3px 10px rgba(0,0,0,.4); }
   .info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
   .t { font-size: 13px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .a { font-size: 11.5px; color: #a0a0a6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
-  .ctl { display: flex; align-items: center; gap: 3px; -webkit-app-region: no-drag; }
+  .ctl { display: flex; align-items: center; gap: 3px; }
   .b { width: 32px; height: 32px; border: none; background: none; color: #d6d6db; border-radius: 8px;
     cursor: pointer; display: flex; align-items: center; justify-content: center; transition: .12s; }
   .b:hover { background: #232327; color: #fff; }
@@ -26,8 +27,8 @@
   .b svg { width: 18px; height: 18px; }
   .b.play svg { width: 20px; height: 20px; }
   .b.like.on { color: #ff4d6a; }
-  .x { position: absolute; top: 4px; right: 6px; width: 18px; height: 18px; border: none; background: none;
-    color: #6c6c72; font-size: 11px; cursor: pointer; -webkit-app-region: no-drag; border-radius: 5px; line-height: 1; }
+  .x { position: absolute; top: 4px; right: 6px; width: 22px; height: 22px; border: none; background: none;
+    color: #6c6c72; font-size: 12px; cursor: pointer; border-radius: 5px; line-height: 1; z-index: 2; }
   .x:hover { color: #fff; background: #26262b; }
 </style>
 </head>
@@ -53,7 +54,32 @@
     $('next').onclick = () => ipcRenderer.send('ss-control', 'next');
     $('play').onclick = () => ipcRenderer.send('ss-control', 'playpause');
     $('like').onclick = () => { $('like').classList.toggle('on'); ipcRenderer.send('ss-control', 'like'); };
-    $('close').onclick = () => ipcRenderer.send('mini-close');
+    $('close').onclick = (e) => { e.stopPropagation(); ipcRenderer.send('mini-close'); };
+    let dragging = false;
+    let playMode = '';
+    function setPlayIcon(playing) {
+      const mode = playing ? 'pause' : 'play';
+      if (playMode === mode) return;
+      playMode = mode;
+      $('play').innerHTML = playing ? ICON_PAUSE : ICON_PLAY;
+    }
+    function beginDrag(e) {
+      if (e.button !== 0) return;
+      dragging = true;
+      ipcRenderer.send('mini-drag-start');
+      e.preventDefault();
+    }
+    function endDrag() {
+      if (!dragging) return;
+      dragging = false;
+      ipcRenderer.send('mini-drag-end');
+    }
+    document.querySelector('.art').addEventListener('mousedown', beginDrag);
+    document.querySelector('.info').addEventListener('mousedown', beginDrag);
+    document.querySelector('.art').addEventListener('dblclick', () => ipcRenderer.send('mini-show-main'));
+    document.querySelector('.info').addEventListener('dblclick', () => ipcRenderer.send('mini-show-main'));
+    window.addEventListener('mouseup', endDrag);
+    window.addEventListener('blur', endDrag);
     ipcRenderer.on('mini-np', (e, d) => {
       if (!d || !d.title) {
         $('t').textContent = 'Nothing playing'; $('a').textContent = '';
@@ -62,7 +88,7 @@
       $('t').textContent = d.title;
       $('a').textContent = d.artist ? ('by ' + d.artist) : 'SoundCloud';
       $('art').style.backgroundImage = d.artwork ? ('url("' + d.artwork + '")') : '';
-      $('play').innerHTML = d.playing ? ICON_PAUSE : ICON_PLAY;
+      setPlayIcon(!!d.playing);
       $('like').classList.toggle('on', !!d.liked);
     });
     var tick = { now: 0, max: 0, playing: false, at: 0 };
@@ -72,7 +98,7 @@
       tick.max = d.max || 0;
       tick.playing = !!d.playing;
       tick.at = Date.now();
-      $('play').innerHTML = tick.playing ? ICON_PAUSE : ICON_PLAY;
+      setPlayIcon(tick.playing);
     });
     (function frame() {
       requestAnimationFrame(frame);
